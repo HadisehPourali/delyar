@@ -1,12 +1,60 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AuthModal from './AuthModal';
 import './StartPage.css';
 
 const StartPage = () => {
   const navigate = useNavigate();
-
-  const handleClick = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const handleChatClick = () => {
     navigate('/chat');
+  };
+
+  const handleLogin = async (userData) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        localStorage.setItem('userData', JSON.stringify(data.user));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
+    }
+  };
+
+  const handleSignup = async (userData) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        localStorage.setItem('userData', JSON.stringify(data.user));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Signup error:', error);
+      return false;
+    }
   };
 
   return (
@@ -19,11 +67,30 @@ const StartPage = () => {
 
       <button 
         className="continue-button"
-        onClick={handleClick}
+        onClick={handleChatClick}
         onMouseEnter={(e) => e.target.style.backgroundColor = '#77b9cc'}
         onMouseLeave={(e) => e.target.style.backgroundColor = '#9ecedb'}
       >
         میتونی از اینجا شروع کنی
+      </button>
+
+      <button 
+        className="auth-button"
+        onClick={() => setIsModalOpen(true)}
+        style={{
+          backgroundColor: '#9ecedb',
+          color: '#224a8a',
+          marginTop: '1rem',
+          padding: '0.8rem 1.5rem',
+          borderRadius: '20px',
+          border: 'none',
+          fontFamily: 'Vazirmatn',
+          cursor: 'pointer'
+        }}
+        onMouseEnter={(e) => e.target.style.backgroundColor = '#77b9cc'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = '#9ecedb'}
+      >
+        ورود / عضویت
       </button>
 
       <div className="info-box">
@@ -40,6 +107,13 @@ const StartPage = () => {
           (: و کمکت میکنم حالت بهتر شه
         </p>
       </div>
+
+      <AuthModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onLogin={handleLogin}
+        onSignup={handleSignup}
+      />
     </div>
   );
 };
