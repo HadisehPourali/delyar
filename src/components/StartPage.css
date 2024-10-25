@@ -1,0 +1,132 @@
+.start-page {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #224a8a;
+    min-height: 100vh;
+    color: #fff;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+  
+  .avatar-image {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    object-fit: cover;
+  }
+  
+  .continue-button {
+    font-family: 'Vazirmatn';
+    padding: 12px 25px;
+    margin-top: 30px;
+    background-color: #9ecedb;
+    border: none;
+    border-radius: 30px;
+    color: #224a8a;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.3s;
+  }
+  
+  .info-box {
+    margin-top: 50px;
+    width: 100%;
+    max-width: 300px;
+    background-color: #9ecedb;
+    border: 2px solid #224a8a;
+    border-radius: 10px;
+    color: #224a8a;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 15px;
+    font-size: 16px;
+    box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
+    animation: fadeIn 3s ease-in-out;
+  }
+  
+  .info-icon {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 10px;
+    object-fit: contain;
+  }
+  
+  .info-text {
+    opacity: 0;
+    animation: fadeSlideIn 2s forwards;
+    margin: 0;
+    padding: 10px;
+  }
+  
+  @keyframes fadeSlideIn {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Media Queries for StartPage */
+  @media (max-width: 768px) {
+    .avatar-image {
+      width: 150px;
+      height: 150px;
+    }
+  
+    .continue-button {
+      font-size: 16px;
+      padding: 10px 20px;
+    }
+  
+    .info-box {
+      max-width: 280px;
+      margin-top: 30px;
+    }
+  
+    .info-icon {
+      width: 80px;
+      height: 80px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .avatar-image {
+      width: 120px;
+      height: 120px;
+    }
+  
+    .continue-button {
+      font-size: 14px;
+      padding: 8px 16px;
+    }
+  
+    .info-box {
+      max-width: 250px;
+      font-size: 14px;
+    }
+  
+    .info-icon {
+        width: 100%; /* The image will scale based on the container's width */
+        max-width: 10px; /* You can set a maximum size */
+        height: auto; /* Maintain the aspect ratio */
+    }
+      
+  }
+  
+  @media (max-height: 600px) {
+    .info-box {
+      margin-top: 20px;
+      padding: 10px;
+    }
+  }
