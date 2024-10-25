@@ -13,9 +13,14 @@ const ChatPage = () => {
   useEffect(() => {
     const createSession = async () => {
       try {
+        // Get user data from localStorage if it exists
+        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+        
         const response = await axios.post('http://127.0.0.1:5000/create-session', {
-          botId: botId
+          botId: botId,
+          username: userData.username || null // Will be null for non-authenticated users
         });
+        
         setSessionId(response.data.id);
       } catch (error) {
         console.error('Error creating session:', error);
@@ -40,16 +45,23 @@ const ChatPage = () => {
     setUserInput('');
 
     try {
+      // Get user data from localStorage if it exists
+      const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+      
       const response = await axios.post('http://127.0.0.1:5000/respond', {
         sessionId: sessionId,
         content: userInput.trim(),
+        username: userData.username || null // Will be null for non-authenticated users
       });
+      
       const botResponse = response.data.content;
       setMessages([...newMessages, { sender: 'bot', content: botResponse }]);
     } catch (error) {
       console.error('Error sending message:', error);
     }
   };
+
+  // Rest of the component remains the same...
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
