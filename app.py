@@ -5,19 +5,28 @@ import bcrypt
 import requests
 import json
 from datetime import datetime
+import os
 
 app = Flask(__name__)
 CORS(app)
 
+DB_USERNAME = os.getenv('DB_USERNAME', 'postgres')
+DB_PASSWORD = os.getenv('DB_PASSWORD', 'JWZQreVcc7ROaQ0p8sjWbPjdNrlirvRN')
+DB_HOST = os.getenv('DB_HOST', 'b350dd21-3f9d-4f95-8393-87607d1c8bbe.hsvc.ir')
+DB_PORT = os.getenv('DB_PORT', '32557')
+DB_NAME = os.getenv('DB_NAME', 'delyar') 
+
+DATABASE_URL = f'postgresql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
+
 # Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:hadiseh@localhost/delyar'
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # Chatbot configuration
-CHATBOT_URL = 'https://api.metisai.ir/api/v1'
+CHATBOT_URL = os.getenv('CHATBOT_URL', 'https://api.metisai.ir/api/v1')
 CHATBOT_HEADERS = {
-    'Authorization': 'Bearer tpsg-3a92YJqTnAqFcoK276VzE634QcXXrDz',
+    'Authorization': os.getenv('CHATBOT_TOKEN', 'Bearer tpsg-3a92YJqTnAqFcoK276VzE634QcXXrDz'),
     'Content-Type': 'application/json',
 }
 
@@ -228,4 +237,5 @@ def login():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

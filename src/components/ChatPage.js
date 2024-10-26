@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './ChatPage.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+
 const ChatPage = () => {
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
@@ -13,12 +15,11 @@ const ChatPage = () => {
   useEffect(() => {
     const createSession = async () => {
       try {
-        // Get user data from localStorage if it exists
         const userData = JSON.parse(localStorage.getItem('userData') || '{}');
         
-        const response = await axios.post('http://127.0.0.1:5000/create-session', {
+        const response = await axios.post(`${API_URL}/create-session`, {
           botId: botId,
-          username: userData.username || null // Will be null for non-authenticated users
+          username: userData.username || null
         });
         
         setSessionId(response.data.id);
@@ -29,14 +30,6 @@ const ChatPage = () => {
     createSession();
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
   const sendMessage = async () => {
     if (!userInput.trim() || !sessionId) return;
 
@@ -45,13 +38,12 @@ const ChatPage = () => {
     setUserInput('');
 
     try {
-      // Get user data from localStorage if it exists
       const userData = JSON.parse(localStorage.getItem('userData') || '{}');
       
-      const response = await axios.post('http://127.0.0.1:5000/respond', {
+      const response = await axios.post(`${API_URL}/respond`, {
         sessionId: sessionId,
         content: userInput.trim(),
-        username: userData.username || null // Will be null for non-authenticated users
+        username: userData.username || null
       });
       
       const botResponse = response.data.content;
@@ -61,7 +53,7 @@ const ChatPage = () => {
     }
   };
 
-  // Rest of the component remains the same...
+
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
