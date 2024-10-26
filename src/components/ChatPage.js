@@ -8,7 +8,7 @@ const ChatPage = () => {
   const [messages, setMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [sessionId, setSessionId] = useState(null);
-  const botId = '2f4a8ee0-b5d0-41af-918b-6c27762d6858';
+  const botId = '7783af83-6fbf-404c-93e6-89c01daaa9f9';
   const chatBoxRef = useRef(null);
   const messagesEndRef = useRef(null);
 
