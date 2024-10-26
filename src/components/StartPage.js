@@ -60,7 +60,7 @@ const StartPage = () => {
   return (
     <div className="start-page">
       <img 
-        src="/images/avatar2.jpg" 
+        src="/images/avatar3.png" 
         alt="avatar" 
         className="avatar-image"
       />
