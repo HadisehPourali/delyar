@@ -6,6 +6,7 @@ import './StartPage.css';
 const StartPage = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [error, setError] = useState('');
   
   const handleChatClick = () => {
     navigate('/chat');
@@ -25,11 +26,14 @@ const StartPage = () => {
       
       if (response.ok) {
         localStorage.setItem('userData', JSON.stringify(data.user));
+        setError(''); // Clear any existing errors
         return true;
       }
+      setError(data.error || 'Login failed');
       return false;
     } catch (error) {
       console.error('Login error:', error);
+      setError('An error occurred during login');
       return false;
     }
   };
@@ -48,13 +52,22 @@ const StartPage = () => {
       
       if (response.ok) {
         localStorage.setItem('userData', JSON.stringify(data.user));
+        setError(''); // Clear any existing errors
         return true;
       }
+      setError(data.error || 'Signup failed');
       return false;
     } catch (error) {
       console.error('Signup error:', error);
+      setError('An error occurred during signup');
       return false;
     }
+  };
+
+  // Reset error when modal is closed
+  const handleModalClose = () => {
+    setError('');
+    setIsModalOpen(false);
   };
 
   return (
@@ -110,9 +123,10 @@ const StartPage = () => {
 
       <AuthModal 
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleModalClose}
         onLogin={handleLogin}
         onSignup={handleSignup}
+        error={error}
       />
     </div>
   );

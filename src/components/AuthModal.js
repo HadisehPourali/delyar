@@ -11,17 +11,17 @@ const initialFormData = {
   disorder: ''
 };
 
-const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
+const AuthModal = ({ isOpen, onClose, onLogin, onSignup, error }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [formData, setFormData] = useState(initialFormData);
-  const [error, setError] = useState('');
+  const [localError, setLocalError] = useState('');
 
   // Reset form when modal is opened/closed
   useEffect(() => {
     if (!isOpen) {
       setFormData(initialFormData);
       setIsLoginMode(true);
-      setError('');
+      setLocalError('');
     }
   }, [isOpen]);
 
@@ -34,10 +34,10 @@ const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setLocalError('');
 
     if (!formData.username || !formData.password) {
-      setError('نام کاربری و رمز عبور الزامی است');
+      setLocalError('نام کاربری و رمز عبور الزامی است');
       return;
     }
 
@@ -46,15 +46,15 @@ const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
         const success = await onLogin(formData);
         if (success) {
           onClose();
-        } else {
-          setError('نام کاربری یا رمز عبور اشتباه است');
         }
       } else {
-        await onSignup(formData);
-        onClose();
+        const success = await onSignup(formData);
+        if (success) {
+          onClose();
+        }
       }
     } catch (err) {
-      setError('خطایی رخ داد. لطفا دوباره تلاش کنید');
+      setLocalError('خطایی رخ داد. لطفا دوباره تلاش کنید');
     }
   };
 
@@ -130,7 +130,11 @@ const AuthModal = ({ isOpen, onClose, onLogin, onSignup }) => {
             </>
           )}
 
-          {error && <div className="error-message">{error}</div>}
+          {(error || localError) && (
+            <div className="error-message">
+              {error || localError}
+            </div>
+          )}
 
           <button type="submit" className="submit-button">
             {isLoginMode ? 'ورود' : 'عضویت'}
