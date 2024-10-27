@@ -349,5 +349,5 @@ if __name__ == '__main__':
         except Exception as e:
             logger.error(f"Error creating database tables: {str(e)}", exc_info=True)
     
-    port = int(os.getenv('PORT', 5000))
+    port = 5000
     app.run(host='0.0.0.0', port=port, debug=True)
