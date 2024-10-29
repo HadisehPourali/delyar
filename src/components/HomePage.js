@@ -9,7 +9,7 @@ const HomePage = () => {
     <div className="home-page">
       <div className="avatar-container">
         <img 
-          src="/images/avatar3.png" 
+          src="/images/avatar3.jpg" 
           alt="Avatar" 
         />
       </div>
