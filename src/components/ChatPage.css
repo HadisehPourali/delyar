@@ -169,3 +169,31 @@
   .logout-button:hover {
     background-color: #77b9cc !important;
   }
+
+  .record-button:hover {
+    background-color: #19386a;
+  }
+  
+  .record-button[data-recording="true"] {
+    background-color: #1dbd72;
+  }
+  
+  .record-button[data-recording="true"]:hover {
+    background-color: #1dbd72;
+  }
+  
+  .input-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+  }
+  
+  .record-button svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  
+
+  
