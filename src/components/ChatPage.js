@@ -2,67 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
-import { Mic, MicOff, X as CloseIcon } from 'lucide-react';
+import { Mic, MicOff } from 'lucide-react';
 import './ChatPage.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
-const STT_API_URL = "https://partai.gw.isahab.ir/speechRecognition/v1/base64";
-const STT_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzeXN0ZW0iOiJzYWhhYiIsImNyZWF0ZVRpbWUiOiIxNDAzMDgwNzEwMDE0NDQ1MCIsInVuaXF1ZUZpZWxkcyI6eyJ1c2VybmFtZSI6IjcxY2Q2NDY0LTUzZDQtNDM1NC05MmVmLWY5YjgxMWMzODE4NSJ9LCJkYXRhIjp7InNlcnZpY2VJRCI6IjlmMjE1NjVjLTcxZmEtNDViMy1hZDQwLTM4ZmY2YTZjNWM2OCIsInJhbmRvbVRleHQiOiJOakg5SSJ9LCJncm91cE5hbWUiOiI0ZTk1YmQ3YjI3ZDQ3Y2FlNGMwNzBkZWIwZTM5Zjc4MSJ9.84iz0OQaxTjLs_x3WIm-jbJoVpdaQcIvcdU4BuSXl0k";
-
-const NotificationBox = ({ message, onClose }) => {
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: '25%', // Changed from '20px' to '25%' to position it 75% down the page
-        left: '50%',
-        transform: 'translateX(-50%)',
-        backgroundColor: '#9ecedb',
-        padding: '12px 24px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        zIndex: 1000,
-        fontFamily: 'Vazirmatn',
-        direction: 'rtl',
-        animation: 'slideIn 0.3s ease-out' // Added smooth entrance animation
-      }}
-    >
-      <span style={{ color: '#19386a' }}>{message}</span>
-      <button
-        onClick={onClose}
-        style={{
-          background: 'none',
-          border: 'none',
-          padding: '4px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        <CloseIcon size={18} color="#19386a" />
-      </button>
-    </div>
-  );
-};
-
-const styleTag = document.createElement('style');
-styleTag.textContent = `
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translate(-50%, 20px);
-    }
-    to {
-      opacity: 1;
-      transform: translate(-50%, 0);
-    }
-  }
-`;
-document.head.appendChild(styleTag);
 
 const MessageBubble = ({ content, sender }) => {
 
@@ -104,8 +47,6 @@ const ChatPage = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [showRecordingText, setShowRecordingText] = useState(false);
-  const [hasShownFilterWarning, setHasShownFilterWarning] = useState(false);
-  const [showNotification, setShowNotification] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const botId = '7783af83-6fbf-404c-93e6-89c01daaa9f9';
@@ -120,9 +61,7 @@ const ChatPage = () => {
       return;
     }
 
-    // Check if we've shown the filter warning before
-    const hasShownWarning = localStorage.getItem('hasShownFilterWarning');
-    setHasShownFilterWarning(!!hasShownWarning);
+    
 
     const createSession = async () => {
       try {
@@ -195,13 +134,6 @@ const ChatPage = () => {
       console.log('Starting recording...');
       setIsRecording(true);
       setShowRecordingText(true);
-      
-      // Show filter warning if it's the first time
-      if (!hasShownFilterWarning) {
-        setShowNotification(true);
-        localStorage.setItem('hasShownFilterWarning', 'true');
-        setHasShownFilterWarning(true);
-      }
 
       audioChunksRef.current = [];
       
@@ -248,20 +180,30 @@ const ChatPage = () => {
 
   const sendAudioToSTT = async (base64Audio) => {
     try {
-      const payload = {
-        language: "fa",
-        data: base64Audio
-      };
-      const headers = {
-        'gateway-token': STT_API_TOKEN,
-        'Content-Type': 'application/json'
-      };
+      // Convert base64 back to blob
+      const blob = base64ToBlob(base64Audio, 'audio/wav');
       
-      console.log('Sending request to STT API...');
-      const response = await axios.post(STT_API_URL, payload, { headers });
-      console.log("Full response data:", response.data);
+      // Create FormData
+      const formData = new FormData();
+      formData.append('file', blob, 'recording.wav');
+      formData.append('model', 'whisper-1');
+  
+      // Get the API key from environment or a secure storage
+      const API_KEY = 'tpsg-3a92YJqTnAqFcoK276VzE634QcXXrDz';
+  
+      // Send request to Metis AI STT API
+      const response = await axios.post(
+        'https://api.metisai.ir/openai/v1/audio/transcriptions', 
+        formData, 
+        {
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
       
-      const resultText = response.data.data?.data?.result;
+      const resultText = response.data.text;
       console.log("Transcription Result:", resultText);
       
       if (resultText) {
@@ -271,6 +213,25 @@ const ChatPage = () => {
     } catch (error) {
       console.error("Error in STT API:", error);
     }
+  };
+
+  const base64ToBlob = (base64, mime) => {
+    mime = mime || '';
+    const sliceSize = 1024;
+    const byteChars = window.atob(base64);
+    const byteArrays = [];
+  
+    for (let offset = 0, len = byteChars.length; offset < len; offset += sliceSize) {
+      const slice = byteChars.slice(offset, offset + sliceSize);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+  
+    return new Blob(byteArrays, { type: mime });
   };
 
   useEffect(() => {
@@ -361,12 +322,6 @@ const ChatPage = () => {
           </button>
         </div>
       </div>
-      {showNotification && (
-        <NotificationBox 
-          message="لطفا فیلترشکن خود را خاموش کنید"
-          onClose={() => setShowNotification(false)}
-        />
-      )}
     </div>
   );
 };
