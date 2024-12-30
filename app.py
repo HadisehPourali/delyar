@@ -14,9 +14,6 @@ CORS(app)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
-CORS(app)
-
 # Database configuration
 DB_USERNAME = 'postgres'
 DB_PASSWORD = 'JWZQreVcc7ROaQ0p8sjWbPjdNrlirvRN'
