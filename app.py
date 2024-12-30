@@ -285,68 +285,69 @@ def create_session():
 
 @app.route('/respond', methods=['POST'])
 def respond_to_chat():
-    data = request.json
-    session_id = data.get('sessionId')
-    content = data.get('content')
-    username = data.get('username')
-    
-    if not session_id or not content:
-        return jsonify({'error': 'Session ID or content not provided'}), 400
-    
-    # Enhance user message with context if user is authenticated
-    if username:
-        user = User.query.filter_by(username=username).first()
-        if user:
-            # Build a comprehensive context using all available user data
-            context_elements = []
-            
-            if user.gender:
-                context_elements.append(f"gender: {user.gender}")
-            
-            if user.age:
-                context_elements.append(f"age group: {user.age}")
-            
-            if user.education:
-                context_elements.append(f"educational background: {user.education}")
-            
-            if user.job:
-                context_elements.append(f"professional experience: {user.job}")
-            
-            if user.disorder:
-                context_elements.append(f"health considerations: {user.disorder}")
-            
-            # Combine all available context elements
-            if context_elements:
-                context = f"""
-                [Context: User message. Consider the following background information:
-                The user has {', '.join(context_elements)}.
-                Please provide a response that is sensitive to and appropriate for their specific circumstances.]
-                
-                User message: {content}
-                """
-            else:
-                context = content
-            
-            content = context
-    
-    message_url = f"{CHATBOT_URL}/chat/session/{session_id}/message"
-    message_data = {
-        "message": {
-            "content": content,
-            "type": "USER"
-        }
-    }
-    
-    response = requests.post(message_url, headers=CHATBOT_HEADERS, json=message_data)
     try:
-        return jsonify(response.json())
-    except requests.exceptions.JSONDecodeError as e:
-            logger.error(f"Failed to decode JSON response: {str(e)}")
-            # Return a fallback response if JSON parsing fails
-            return jsonify({
-                "content": "متاسفم :( مثل اینکه با اینترنتت به مشکل خوردیم. اگر امکانش رو داری اینترنتت رو عوض کن و دوباره امتحان کن",
-                "type": "BOT"
-            }), 200
+        data = request.json
+        session_id = data.get('sessionId')
+        content = data.get('content')
+        username = data.get('username')
+        
+        if not session_id or not content:
+            return jsonify({'error': 'Session ID or content not provided'}), 400
+        
+        # Enhance user message with context if user is authenticated
+        if username:
+            user = User.query.filter_by(username=username).first()
+            if user:
+                # Build a comprehensive context using all available user data
+                context_elements = []
+                
+                if user.gender:
+                    context_elements.append(f"gender: {user.gender}")
+                
+                if user.age:
+                    context_elements.append(f"age group: {user.age}")
+                
+                if user.education:
+                    context_elements.append(f"educational background: {user.education}")
+                
+                if user.job:
+                    context_elements.append(f"professional experience: {user.job}")
+                
+                if user.disorder:
+                    context_elements.append(f"health considerations: {user.disorder}")
+                
+                # Combine all available context elements
+                if context_elements:
+                    context = f"""
+                    [Context: User message. Consider the following background information:
+                    The user has {', '.join(context_elements)}.
+                    Please provide a response that is sensitive to and appropriate for their specific circumstances.]
+                    
+                    User message: {content}
+                    """
+                else:
+                    context = content
+                
+                content = context
+        
+        message_url = f"{CHATBOT_URL}/chat/session/{session_id}/message"
+        message_data = {
+            "message": {
+                "content": content,
+                "type": "USER"
+            }
+        }
+        
+        response = requests.post(message_url, headers=CHATBOT_HEADERS, json=message_data)
+        try:
+            return jsonify(response.json())
+        except requests.exceptions.JSONDecodeError as e:
+                logger.error(f"Failed to decode JSON response: {str(e)}")
+                # Return a fallback response if JSON parsing fails
+                return jsonify({
+                    "content": "متاسفم :( مثل اینکه با اینترنتت به مشکل خوردیم. اگر امکانش رو داری اینترنتت رو عوض کن و دوباره امتحان کن",
+                    "type": "BOT"
+                }), 200
             
     except requests.exceptions.RequestException as e:
         logger.error(f"API request failed: {str(e)}")
