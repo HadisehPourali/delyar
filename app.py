@@ -338,7 +338,31 @@ def respond_to_chat():
     }
     
     response = requests.post(message_url, headers=CHATBOT_HEADERS, json=message_data)
-    return jsonify(response.json())
+    try:
+        return jsonify(response.json())
+    except requests.exceptions.JSONDecodeError as e:
+            logger.error(f"Failed to decode JSON response: {str(e)}")
+            # Return a fallback response if JSON parsing fails
+            return jsonify({
+                "content": "متاسفم :( مثل اینکه با اینترنتت به مشکل خوردیم. اگر امکانش رو داری اینترنتت رو عوض کن و دوباره امتحان کن",
+                "type": "BOT"
+            }), 200
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"API request failed: {str(e)}")
+        return jsonify({
+            "error": "Failed to communicate with the chat service",
+            "content": "من عذرخواهی می کنم، اما در حال حاضر در پردازش پیام شما با مشکل مواجه هستم. لطفاً چند لحظه دیگر دوباره امتحان کنید.",
+            "type": "ERROR"
+        }), 503
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in respond_to_chat: {str(e)}", exc_info=True)
+        return jsonify({
+            "error": "An unexpected error occurred",
+            "content": "من عذرخواهی می کنم، اما مشکلی پیش آمده. لطفاً بعداً دوباره امتحان کنید.",
+            "type": "ERROR"
+        }), 500
 
 if __name__ == '__main__':
     with app.app_context():
