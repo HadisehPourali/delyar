@@ -8,9 +8,6 @@ from datetime import datetime
 import os
 import logging
 
-app = Flask(__name__)
-CORS(app)
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
