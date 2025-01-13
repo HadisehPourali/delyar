@@ -53,6 +53,7 @@ const ChatPage = () => {
   const botId = '7783af83-6fbf-404c-93e6-89c01daaa9f9';
   const chatBoxRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
 
   useEffect(() => {
@@ -83,6 +84,12 @@ const ChatPage = () => {
       setSttTriggered(false);
     }
   }, [userInput, sttTriggered, isWaitingForResponse]);
+
+  useEffect(() => {
+    if (!isWaitingForResponse && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isWaitingForResponse]);
 
   const handleLogout = () => {
     localStorage.removeItem('userData');
@@ -312,6 +319,7 @@ const ChatPage = () => {
             )}
           </div>
           <input
+            ref={inputRef}
             style={{ 
               fontFamily: 'Vazirmatn', 
               textAlign: 'right', 
