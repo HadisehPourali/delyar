@@ -286,43 +286,25 @@ def respond_to_chat():
     session_id = data.get('sessionId')
     content = data.get('content')
     username = data.get('username')
+    is_first_message = data.get('isFirstMessage', False)
     
     if not session_id or not content:
         return jsonify({'error': 'Session ID or content not provided'}), 400
     
-    # Enhance user message with context if user is authenticated
-    if username:
+    if is_first_message and username:
         user = User.query.filter_by(username=username).first()
         if user:
-            # Build a comprehensive context using all available user data
-            context_elements = []
-            
-            if user.gender:
-                context_elements.append(f"gender: {user.gender}")
-            
-            if user.age:
-                context_elements.append(f"age group: {user.age}")
-            
-            if user.education:
-                context_elements.append(f"educational background: {user.education}")
-            
-            if user.job:
-                context_elements.append(f"professional experience: {user.job}")
-            
-            if user.disorder:
-                context_elements.append(f"health considerations: {user.disorder}")
-            
-            # Combine all available context elements
-            if context_elements:
-                context = f"""
-                [Context: User message. Consider the following background information:
-                The user has {', '.join(context_elements)}.
-                Please provide a response that is sensitive to and appropriate for their specific circumstances.]
-                
-                User message: {content}
-                """
-            else:
-                context = content
+            context = f"""[System Note: This user has provided the following information:
+Gender: {user.gender or 'Not specified'}
+Age: {user.age or 'Not specified'}
+Education: {user.education or 'Not specified'}
+Job: {user.job or 'Not specified'}
+Health Considerations: {user.disorder or 'Not specified'}
+
+Please consider this information while interacting with the user and reference it when relevant.
+Remember these details throughout the conversation.]
+
+User message: {content}"""
             
             content = context
     

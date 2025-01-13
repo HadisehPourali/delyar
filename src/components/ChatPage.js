@@ -108,6 +108,8 @@ const ChatPage = () => {
   const sendMessage = async () => {
     if (!userInput.trim() || !sessionId || isWaitingForResponse) return;
     setIsWaitingForResponse(true);
+
+    const isFirstMessage = messages.length === 0;
     const newMessages = [...messages, { sender: 'user', content: userInput.trim() }];
     setMessages([...newMessages, { sender: 'bot', content: '' }]);
     setUserInput('');
@@ -117,7 +119,8 @@ const ChatPage = () => {
       const response = await axios.post(`${API_URL}/respond`, { 
         sessionId, 
         content: userInput.trim(), 
-        username: userData.username || null 
+        username: userData.username || null,
+        isFirstMessage
       });
       streamBotResponse(response.data.content);
     } catch (error) {
