@@ -7,6 +7,8 @@ import json
 from datetime import datetime
 import os
 import logging
+from dotenv import load_dotenv
+load_dotenv()
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -15,11 +17,11 @@ app = Flask(__name__)
 CORS(app)
 
 # Database configuration
-DB_USERNAME = 'postgres'
-DB_PASSWORD = 'JWZQreVcc7ROaQ0p8sjWbPjdNrlirvRN'
-DB_HOST = 'b350dd21-3f9d-4f95-8393-87607d1c8bbe.hsvc.ir'
-DB_PORT = '32557'
-DB_NAME = 'delyar'
+DB_USERNAME = os.getenv('DB_USERNAME')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT')
+DB_NAME = os.getenv('DB_NAME')
 
 # Construct database URL - note the specific format
 DATABASE_URL = f'postgresql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
@@ -33,9 +35,9 @@ app.config['SQLALCHEMY_ECHO'] = True  # Enable SQL query logging
 db = SQLAlchemy(app)
 
 # Chatbot configuration
-CHATBOT_URL = os.getenv('CHATBOT_URL', 'https://api.metisai.ir/api/v1')
+CHATBOT_URL = os.getenv('CHATBOT_URL')
 CHATBOT_HEADERS = {
-    'Authorization': os.getenv('CHATBOT_TOKEN', 'Bearer tpsg-3a92YJqTnAqFcoK276VzE634QcXXrDz'),
+    'Authorization': os.getenv('CHATBOT_TOKEN'),
     'Content-Type': 'application/json',
 }
 

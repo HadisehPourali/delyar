@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, MicOff } from 'lucide-react';
 import './ChatPage.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+const API_URL = process.env.REACT_APP_API_URL
 
 const MessageBubble = ({ content, sender }) => {
 
@@ -50,7 +50,7 @@ const ChatPage = () => {
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const botId = '7783af83-6fbf-404c-93e6-89c01daaa9f9';
+  const botId = process.env.REACT_APP_BOT_ID;
   const chatBoxRef = useRef(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -203,7 +203,7 @@ const ChatPage = () => {
       formData.append('model', 'whisper-1');
   
       // Get the API key from environment or a secure storage
-      const API_KEY = 'tpsg-3a92YJqTnAqFcoK276VzE634QcXXrDz';
+      const REACT_APP_STT_API_KEY = process.env.REACT_APP_STT_API_KEY;
   
       // Send request to Metis AI STT API
       const response = await axios.post(
@@ -211,7 +211,7 @@ const ChatPage = () => {
         formData, 
         {
           headers: {
-            'Authorization': `Bearer ${API_KEY}`,
+            'Authorization': `Bearer ${REACT_APP_STT_API_KEY}`,
             'Content-Type': 'multipart/form-data'
           }
         }
