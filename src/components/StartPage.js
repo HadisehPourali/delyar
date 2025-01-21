@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthModal from './AuthModal';
 import './StartPage.css';
+import EmergencyContact from './EmergencyContact';
 
 const StartPage = () => {
   const navigate = useNavigate();
@@ -135,6 +136,8 @@ const StartPage = () => {
         onSignup={handleSignup}
         error={error}
       />
+
+      <EmergencyContact />
     </div>
   );
 };

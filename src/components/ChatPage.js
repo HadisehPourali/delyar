@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mic, MicOff } from 'lucide-react';
 import './ChatPage.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000';
+const API_URL = process.env.REACT_APP_API_URL
 
 const MessageBubble = ({ content, sender }) => {
 
@@ -47,11 +47,13 @@ const ChatPage = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [showRecordingText, setShowRecordingText] = useState(false);
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const botId = '7783af83-6fbf-404c-93e6-89c01daaa9f9';
+  const botId = process.env.REACT_APP_BOT_ID;
   const chatBoxRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
 
   useEffect(() => {
@@ -77,11 +79,17 @@ const ChatPage = () => {
   }, [navigate]);
 
   useEffect(() => {
-    if (sttTriggered && userInput.trim() !== "") {
+    if (sttTriggered && userInput.trim() !== "" && !isWaitingForResponse) {
       sendMessage();
       setSttTriggered(false);
     }
-  }, [userInput, sttTriggered]);
+  }, [userInput, sttTriggered, isWaitingForResponse]);
+
+  useEffect(() => {
+    if (!isWaitingForResponse && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isWaitingForResponse]);
 
   const handleLogout = () => {
     localStorage.removeItem('userData');
@@ -99,12 +107,16 @@ const ChatPage = () => {
         index += 1;
       } else {
         clearInterval(streamInterval);
+        setIsWaitingForResponse(false);
       }
     }, 25);
   };
 
   const sendMessage = async () => {
-    if (!userInput.trim() || !sessionId) return;
+    if (!userInput.trim() || !sessionId || isWaitingForResponse) return;
+    setIsWaitingForResponse(true);
+
+    const isFirstMessage = messages.length === 0;
     const newMessages = [...messages, { sender: 'user', content: userInput.trim() }];
     setMessages([...newMessages, { sender: 'bot', content: '' }]);
     setUserInput('');
@@ -114,16 +126,18 @@ const ChatPage = () => {
       const response = await axios.post(`${API_URL}/respond`, { 
         sessionId, 
         content: userInput.trim(), 
-        username: userData.username || null 
+        username: userData.username || null,
+        isFirstMessage
       });
       streamBotResponse(response.data.content);
     } catch (error) {
       console.error('Error sending message:', error);
+      setIsWaitingForResponse(false);
     }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !isWaitingForResponse) {
       e.preventDefault();
       sendMessage();
     }
@@ -189,7 +203,7 @@ const ChatPage = () => {
       formData.append('model', 'whisper-1');
   
       // Get the API key from environment or a secure storage
-      const API_KEY = 'tpsg-3a92YJqTnAqFcoK276VzE634QcXXrDz';
+      const REACT_APP_STT_API_KEY = process.env.REACT_APP_STT_API_KEY;
   
       // Send request to Metis AI STT API
       const response = await axios.post(
@@ -197,7 +211,7 @@ const ChatPage = () => {
         formData, 
         {
           headers: {
-            'Authorization': `Bearer ${API_KEY}`,
+            'Authorization': `Bearer ${REACT_APP_STT_API_KEY}`,
             'Content-Type': 'multipart/form-data'
           }
         }
@@ -271,18 +285,20 @@ const ChatPage = () => {
             <button 
               onClick={isRecording ? stopRecording : startRecording}
               className="record-button"
+              disabled={isWaitingForResponse}
               style={{
                 color: '#19386a',
                 background: 'none',
                 border: 'none',
-                cursor: 'pointer',
+                cursor: isWaitingForResponse ? 'not-allowed' : 'pointer',
                 padding: '8px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: '50%',
                 backgroundColor: isRecording ? '#1dbd72' : 'transparent',
-                transition: 'all 0.3s ease'
+                transition: 'all 0.3s ease',
+                opacity: isWaitingForResponse ? 0.5 : 1
               }}
             >
               {isRecording ? (
@@ -303,22 +319,30 @@ const ChatPage = () => {
             )}
           </div>
           <input
+            ref={inputRef}
             style={{ 
               fontFamily: 'Vazirmatn', 
               textAlign: 'right', 
-              direction: 'rtl'
+              direction: 'rtl',
+              opacity: isWaitingForResponse ? 0.7 : 1
             }}
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="پیام به دلیار"
+            placeholder={isWaitingForResponse ? "لطفا منتظر پاسخ بمانید..." : "پیام به دلیار"}
+            disabled={isWaitingForResponse}
           />
           <button 
             onClick={sendMessage} 
-            style={{ fontFamily: 'Vazirmatn' }}
+            style={{ 
+              fontFamily: 'Vazirmatn',
+              opacity: isWaitingForResponse ? 0.7 : 1,
+              cursor: isWaitingForResponse ? 'not-allowed' : 'pointer'
+            }}
+            disabled={isWaitingForResponse}
           >
-            ارسال
+            {isWaitingForResponse ? "ارسال" : "ارسال"}
           </button>
         </div>
       </div>

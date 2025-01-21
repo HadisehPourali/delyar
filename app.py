@@ -7,19 +7,21 @@ import json
 from datetime import datetime
 import os
 import logging
-
-app = Flask(__name__)
-CORS(app)
+from dotenv import load_dotenv
+load_dotenv()
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+app = Flask(__name__)
+CORS(app)
+
 # Database configuration
-DB_USERNAME = 'postgres'
-DB_PASSWORD = 'JWZQreVcc7ROaQ0p8sjWbPjdNrlirvRN'
-DB_HOST = 'b350dd21-3f9d-4f95-8393-87607d1c8bbe.hsvc.ir'
-DB_PORT = '32557'
-DB_NAME = 'delyar'
+DB_USERNAME = os.getenv('DB_USERNAME')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = os.getenv('DB_PORT')
+DB_NAME = os.getenv('DB_NAME')
 
 # Construct database URL - note the specific format
 DATABASE_URL = f'postgresql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
@@ -33,9 +35,9 @@ app.config['SQLALCHEMY_ECHO'] = True  # Enable SQL query logging
 db = SQLAlchemy(app)
 
 # Chatbot configuration
-CHATBOT_URL = os.getenv('CHATBOT_URL', 'https://api.metisai.ir/api/v1')
+CHATBOT_URL = os.getenv('CHATBOT_URL')
 CHATBOT_HEADERS = {
-    'Authorization': os.getenv('CHATBOT_TOKEN', 'Bearer tpsg-3a92YJqTnAqFcoK276VzE634QcXXrDz'),
+    'Authorization': os.getenv('CHATBOT_TOKEN'),
     'Content-Type': 'application/json',
 }
 
@@ -282,85 +284,42 @@ def create_session():
 
 @app.route('/respond', methods=['POST'])
 def respond_to_chat():
-    try:
-        data = request.json
-        session_id = data.get('sessionId')
-        content = data.get('content')
-        username = data.get('username')
-        
-        if not session_id or not content:
-            return jsonify({'error': 'Session ID or content not provided'}), 400
-        
-        # Enhance user message with context if user is authenticated
-        if username:
-            user = User.query.filter_by(username=username).first()
-            if user:
-                # Build a comprehensive context using all available user data
-                context_elements = []
-                
-                if user.gender:
-                    context_elements.append(f"gender: {user.gender}")
-                
-                if user.age:
-                    context_elements.append(f"age group: {user.age}")
-                
-                if user.education:
-                    context_elements.append(f"educational background: {user.education}")
-                
-                if user.job:
-                    context_elements.append(f"professional experience: {user.job}")
-                
-                if user.disorder:
-                    context_elements.append(f"health considerations: {user.disorder}")
-                
-                # Combine all available context elements
-                if context_elements:
-                    context = f"""
-                    [Context: User message. Consider the following background information:
-                    The user has {', '.join(context_elements)}.
-                    Please provide a response that is sensitive to and appropriate for their specific circumstances.]
-                    
-                    User message: {content}
-                    """
-                else:
-                    context = content
-                
-                content = context
-        
-        message_url = f"{CHATBOT_URL}/chat/session/{session_id}/message"
-        message_data = {
-            "message": {
-                "content": content,
-                "type": "USER"
-            }
-        }
-        
-        response = requests.post(message_url, headers=CHATBOT_HEADERS, json=message_data)
-        try:
-            return jsonify(response.json())
-        except requests.exceptions.JSONDecodeError as e:
-                logger.error(f"Failed to decode JSON response: {str(e)}")
-                # Return a fallback response if JSON parsing fails
-                return jsonify({
-                    "content": "متاسفم :( مثل اینکه با اینترنتت به مشکل خوردیم. اگر امکانش رو داری اینترنتت رو عوض کن و دوباره امتحان کن",
-                    "type": "BOT"
-                }), 200
+    data = request.json
+    session_id = data.get('sessionId')
+    content = data.get('content')
+    username = data.get('username')
+    is_first_message = data.get('isFirstMessage', False)
+    
+    if not session_id or not content:
+        return jsonify({'error': 'Session ID or content not provided'}), 400
+    
+    if is_first_message and username:
+        user = User.query.filter_by(username=username).first()
+        if user:
+            context = f"""[System Note: This user has provided the following information:
+Gender: {user.gender or 'Not specified'}
+Age: {user.age or 'Not specified'}
+Education: {user.education or 'Not specified'}
+Job: {user.job or 'Not specified'}
+Health Considerations: {user.disorder or 'Not specified'}
+
+Please consider this information while interacting with the user and reference it when relevant.
+Remember these details throughout the conversation.]
+
+User message: {content}"""
             
-    except requests.exceptions.RequestException as e:
-        logger.error(f"API request failed: {str(e)}")
-        return jsonify({
-            "error": "Failed to communicate with the chat service",
-            "content": "من عذرخواهی می کنم، اما در حال حاضر در پردازش پیام شما با مشکل مواجه هستم. لطفاً چند لحظه دیگر دوباره امتحان کنید.",
-            "type": "ERROR"
-        }), 503
-        
-    except Exception as e:
-        logger.error(f"Unexpected error in respond_to_chat: {str(e)}", exc_info=True)
-        return jsonify({
-            "error": "An unexpected error occurred",
-            "content": "من عذرخواهی می کنم، اما مشکلی پیش آمده. لطفاً بعداً دوباره امتحان کنید.",
-            "type": "ERROR"
-        }), 500
+            content = context
+    
+    message_url = f"{CHATBOT_URL}/chat/session/{session_id}/message"
+    message_data = {
+        "message": {
+            "content": content,
+            "type": "USER"
+        }
+    }
+    
+    response = requests.post(message_url, headers=CHATBOT_HEADERS, json=message_data)
+    return jsonify(response.json())
 
 if __name__ == '__main__':
     with app.app_context():
