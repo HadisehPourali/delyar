@@ -8,12 +8,27 @@
 .sos-button {
   background-color: #ff4444;
   color: white;
-  padding: 10px 20px;
+  padding: clamp(6px, 2vw, 10px) clamp(10px, 3vw, 20px);
   border: none;
   border-radius: 10px;
   font-family: 'Vazirmatn', sans-serif;
   cursor: pointer;
   transition: background-color 0.3s;
+  font-size: clamp(10px, 2.5vw, 18px);
+  position: fixed;
+  top: clamp(10px, 2vh, 20px);
+  right: clamp(10px, 2vw, 20px);
+  z-index: 1000;
+}
+
+.supportive-message {
+  font-size: clamp(18px, 2.5vw, 24px);
+  margin-top: clamp(20px, 4vh, 30px);
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+  display: block;
+  text-align: center;
+  color: #224a8a;
 }
 
 .sos-button:hover {
@@ -22,26 +37,26 @@
 
 .contact-list {
   position: fixed;
-  bottom: 70px;
-  right: 20px;
+  top: clamp(60px, 10vh, 100px);
+  right: clamp(10px, 2vw, 20px);
   background-color: white;
   border: 1px solid #ccc;
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  padding: 20px;
+  padding: clamp(15px, 3vw, 25px);
   font-family: 'Vazirmatn', sans-serif;
   text-align: right;
   direction: rtl;
   animation: fadeIn 0.3s ease-in-out;
-  color: #224a8a; /* Ensure text color is dark */
-  max-width: 300px; /* Set a maximum width */
-  word-wrap: break-word; /* Ensure long text wraps */
+  color: #224a8a;
+  width: clamp(200px, 90vw, 300px);
+  z-index: 999;
 }
 
 .contact-list p {
   font-size: 16px;
   margin-bottom: 10px;
-  color: #224a8a; /* Ensure text color is dark */
+  color: #224a8a;
 }
 
 .contact-list ul {
@@ -52,7 +67,7 @@
 .contact-list li {
   margin-bottom: 5px;
   font-size: 14px;
-  color: #224a8a; /* Ensure text color is dark */
+  color: #224a8a;
 }
 
 .phone-number {
@@ -73,7 +88,7 @@
   font-size: 20px;
   cursor: pointer;
   color: #ff4444;
-  outline: none; /* Remove the blue box around the close button */
+  outline: none;
 }
 
 @keyframes fadeIn {
@@ -84,5 +99,18 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .contact-list {
+    right: 50%;
+    transform: translateX(50%);
+    width: 90%;
+    max-width: none;
+  }
+  
+  .sos-button {
+    right: 10px;
   }
 }
