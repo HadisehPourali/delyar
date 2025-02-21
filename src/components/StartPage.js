@@ -147,7 +147,7 @@ const StartPage = () => {
       />
 
       <img 
-        src="/images/avatar3.jpg" 
+        src="/images/avatar3.png" 
         alt="avatar" 
         className="avatar-image"
       />

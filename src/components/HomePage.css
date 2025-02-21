@@ -1,75 +1,93 @@
 .home-page {
-    background-color: #224a8a;
-    color: #9ecedb;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-  }
-  
-  .avatar-container {
-    width: clamp(100px, 30vw, 150px);
-    margin-bottom: 2rem;
-  }
-  
-  .avatar-container img {
-    width: 100%;
-    height: auto;
-    border-radius: 50%;
-    animation: float 3s ease-in-out infinite;
+  background-color: #224a8a;
+  color: #9ecedb;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.avatar-container {
+  width: 200px;
+  height: 200px;
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.avatar-container img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  animation: float 3s ease-in-out infinite;
+}
+
+.scrolling-text {
+  height: clamp(40px, 10vh, 60px);
+  overflow: hidden;
+  position: relative;
+  width: 90%;
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+  direction: rtl;
+}
+
+.scrolling-text p {
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  margin: 0;
+  position: relative;
+  animation: scrollText 9s linear infinite;
+  text-align: center;
+  width: 100%;
+}
+
+.action-button {
+  font-family: 'Vazirmatn';
+  margin-top: clamp(20px, 5vh, 60px);
+  padding: clamp(10px, 2vw, 15px) clamp(15px, 3vw, 30px);
+  font-size: clamp(0.875rem, 2vw, 1.125rem);
+  border-radius: 20px;
+}
+
+@media (max-width: 768px) {
+  .home-page {
+    padding-top: 2rem;
+    justify-content: flex-start;
   }
   
   .scrolling-text {
-    height: clamp(40px, 10vh, 60px);
-    overflow: hidden;
-    position: relative;
-    width: 90%;
-    max-width: 600px;
-    margin: 0 auto;
-    text-align: center;
-    direction: rtl;
+    width: 95%;
   }
   
-  .scrolling-text p {
-    font-size: clamp(1rem, 3vw, 1.5rem);
-    margin: 0;
-    position: relative;
-    animation: scrollText 9s linear infinite;
-    text-align: center;
-    width: 100%;
+  .avatar-container {
+    width: 150px;
+    height: 150px;
   }
-  
-  .action-button {
-    font-family: 'Vazirmatn';
-    margin-top: clamp(20px, 5vh, 60px);
-    padding: clamp(10px, 2vw, 15px) clamp(15px, 3vw, 30px);
-    font-size: clamp(0.875rem, 2vw, 1.125rem);
-    border-radius: 20px;
+}
+
+@media (max-width: 480px) {
+  .avatar-container {
+    width: 120px;
+    height: 120px;
   }
-  
-  @media (max-width: 768px) {
-    .home-page {
-      padding-top: 2rem;
-      justify-content: flex-start;
-    }
-    
-    .scrolling-text {
-      width: 95%;
-    }
-  }
-  
-  /* Keep existing animations */
-  @keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
-    100% { transform: translateY(0px); }
-  }
-  
-  @keyframes scrollText {
-    0% { transform: translateY(100%); }
-    33% { transform: translateY(0); }
-    66% { transform: translateY(-100%); }
-    100% { transform: translateY(-200%); }
-  }
+}
+
+/* Keep existing animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes scrollText {
+  0% { transform: translateY(100%); }
+  33% { transform: translateY(0); }
+  66% { transform: translateY(-100%); }
+  100% { transform: translateY(-200%); }
+}
