@@ -1,9 +1,8 @@
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import bcrypt
 import requests
-import json
 from datetime import datetime
 import os
 import logging
@@ -41,7 +40,6 @@ CHATBOT_HEADERS = {
     'Content-Type': 'application/json',
 }
 
-# User model
 class User(db.Model):
     __tablename__ = 'users'
     
@@ -65,56 +63,74 @@ class User(db.Model):
             'disorder': self.disorder
         }
 
-@app.route('/test-db-detailed', methods=['GET'])
-def test_db_detailed():
-    """Extended database testing endpoint"""
+@app.route('/api/chat/sessions', methods=['GET'])
+def get_chat_sessions():
     try:
-        # Test 1: Basic connection
-        logger.info("Testing basic database connection...")
-        db.session.execute('SELECT 1')
+        username = request.args.get('userId')
+        page = request.args.get('page', '0')
+        size = request.args.get('size', '10')
+        bot_id = os.getenv('BOT_ID')  # Get from environment variables
         
-        # Test 2: Create table if not exists
-        logger.info("Testing table creation...")
-        with app.app_context():
-            db.create_all()
+        if not username:
+            logger.error("No userId provided in request")
+            return jsonify({'error': 'userId is required'}), 400
+
+        # Include both userId and botId in the request
+        params = {
+            'page': page,
+            'size': size
+        }
         
-        # Test 3: Try inserting and querying a test user
-        logger.info("Testing user insertion and query...")
-        test_user = User(
-            username=f"test_user_{datetime.now().timestamp()}",
-            password=bcrypt.hashpw("test123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'),
-            gender="test"
+        # Add filters if they exist
+        if username:
+            params['userId'] = username
+        if bot_id:
+            params['botId'] = bot_id
+            
+        response = requests.get(
+            f"{CHATBOT_URL}/chat/session",
+            headers=CHATBOT_HEADERS,
+            params=params
         )
         
-        db.session.add(test_user)
-        db.session.commit()
-        
-        # Query the test user
-        queried_user = User.query.filter_by(username=test_user.username).first()
-        
-        # Cleanup
-        db.session.delete(test_user)
-        db.session.commit()
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'All database tests passed successfully',
-            'details': {
-                'connection': 'successful',
-                'table_creation': 'successful',
-                'test_user_creation': 'successful',
-                'test_user_query': 'successful'
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Database test failed: {str(e)}", exc_info=True)
-        return jsonify({
-            'status': 'error',
-            'message': 'Database test failed',
-            'error': str(e)
-        }), 500
+        if response.ok:
+            return jsonify(response.json()), response.status_code
+        else:
+            logger.error(f"Error from Metis AI: {response.text}")
+            return jsonify({'error': 'Failed to retrieve chat sessions'}), response.status_code
 
+    except Exception as e:
+        logger.error(f"Error retrieving chat sessions: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to retrieve chat sessions'}), 500
+    
+@app.route('/api/chat/sessions/<session_id>', methods=['GET'])
+def get_chat_session(session_id):
+    try:
+        response = requests.get(
+            f"{CHATBOT_URL}/chat/session/{session_id}",
+            headers=CHATBOT_HEADERS
+        )
+        
+        if response.ok:
+            session_data = response.json()
+            messages = []
+            if 'messages' in session_data:
+                messages = session_data['messages']
+            elif 'history' in session_data:
+                messages = session_data['history']
+            
+            return jsonify({
+                'id': session_id,
+                'messages': messages,
+                'title': session_data.get('title', 'گفتگوی جدید')
+            })
+            
+        logger.error(f"Failed to retrieve session {session_id}: {response.text}")
+        return jsonify({'error': 'Failed to retrieve chat session'}), response.status_code
+
+    except Exception as e:
+        logger.error(f"Error retrieving chat session: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to retrieve chat session'}), 500
 
 @app.route('/api/signup', methods=['POST'])
 def signup():
@@ -189,16 +205,6 @@ def login():
         print(f"Error in login: {str(e)}")
         return jsonify({'error': 'An error occurred during login'}), 500
 
-# Simple test route to verify database connection
-@app.route('/test-db')
-def test_db():
-    try:
-        db.session.execute('SELECT 1')
-        return jsonify({'message': 'Database connection successful'})
-    except Exception as e:
-        return jsonify({'error': f'Database connection failed: {str(e)}'}), 500
-
-# Initialize database tables
 def init_db():
     with app.app_context():
         try:
@@ -207,81 +213,43 @@ def init_db():
         except Exception as e:
             print(f"Error creating database tables: {str(e)}")
 
-def generate_initial_prompt(user_data=None):
-    """Generate the initial prompt based on user data if available"""
-    base_prompt = """
-    As an empathetic and supportive companion, I'm here to listen and help you process your thoughts and feelings. 
-    My role is to create a safe, non-judgmental space where you can freely express yourself.
-    """
-    
-    if user_data:
-        # Craft a personalized context for the chatbot without directly referencing the data
-        context_prompt = f"""
-        Context: Speaking with someone who has shared some background about themselves.
-        Their life experience includes aspects of {user_data.get('education', '')} and {user_data.get('job', '')}.
-        They are in the {user_data.get('age', '')} age range.
-        Key considerations: {user_data.get('disorder', 'No specific conditions mentioned')}.
-        
-        Approach:
-        - Maintain a supportive and understanding tone
-        - Draw relevant insights from their background when appropriate
-        - Be mindful of their specific circumstances
-        - Focus on creating a comfortable space for open dialogue
-        """
-        return base_prompt + context_prompt
-    
-    return base_prompt
-
 
 @app.route('/create-session', methods=['POST'])
 def create_session():
-    bot_id = request.json.get('botId')
-    username = request.json.get('username')
-    
-    if not bot_id:
-        return jsonify({'error': 'Bot ID not provided'}), 400
+    try:
+        bot_id = request.json.get('botId')
+        username = request.json.get('username')
         
-    user_data = None
-    if username:
-        user = User.query.filter_by(username=username).first()
-        if user:
-            user_data = {
-                'username': user.username,
-                'gender': user.gender,
-                'age': user.age,
-                'education': user.education,
-                'job': user.job,
-                'disorder': user.disorder
+        if not bot_id:
+            return jsonify({'error': 'Bot ID not provided'}), 400
+        
+        user = None
+        if username:
+            user = {
+                "id": username,
+                "name": username
             }
-    
-    session_data = {
-        "botId": bot_id,
-        "user": None,
-        "initialMessages": None
-    }
-    
-    response = requests.post(
-        f"{CHATBOT_URL}/chat/session", 
-        headers=CHATBOT_HEADERS, 
-        data=json.dumps(session_data)
-    )
-    
-    session_response = response.json()
-    
-    # If session created successfully and we have user data, send initial prompt
-    if 'id' in session_response:
-        initial_prompt = generate_initial_prompt(user_data)
-        message_url = f"{CHATBOT_URL}/chat/session/{session_response['id']}/message"
-        message_data = {
-            "message": {
-                "content": initial_prompt,
-                "type": "SYSTEM"
-            }
+        
+        session_data = {
+            "botId": bot_id,
+            "user": user,
+            "initialMessages": None
         }
-        requests.post(message_url, headers=CHATBOT_HEADERS, json=message_data)
-    
-    return jsonify(session_response)
-
+        
+        response = requests.post(
+            f"{CHATBOT_URL}/chat/session", 
+            headers=CHATBOT_HEADERS, 
+            json=session_data
+        )
+        
+        session_response = response.json()
+        
+        return jsonify(session_response)
+        
+    except Exception as e:
+        logger.error(f"Error creating session: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Failed to create session: {str(e)}'}), 500
+        
 @app.route('/respond', methods=['POST'])
 def respond_to_chat():
     data = request.json

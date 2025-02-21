@@ -1,13 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Mic, MicOff } from 'lucide-react';
 import './ChatPage.css';
 
-const API_URL = process.env.REACT_APP_API_URL
+const API_URL = process.env.REACT_APP_API_URL;
 
-const MessageBubble = ({ content, sender }) => {
+const MessageBubble = ({ content, sender, type }) => {
+  // Don't render system messages
+  if (type === 'SYSTEM' || type === 'NAMING_PROMPT') {
+    return null;
+  }
+
+  // Filter out system notes if present in user message
+  const displayContent = sender === 'user' 
+    ? content.replace(/\[System Note:[\s\S]*?User message: /, '').trim()
+    : content;
+
+  // Don't render empty messages
+  if (!displayContent) {
+    return null;
+  }
 
   return (
     <div 
@@ -32,15 +46,15 @@ const MessageBubble = ({ content, sender }) => {
           br: () => <br />,
         }}
       >
-        {content}
+        {displayContent}
       </ReactMarkdown>
     </div>
-    
   );
 };
 
 const ChatPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [messages, setMessages] = useState([]);
   const [sttTriggered, setSttTriggered] = useState(false);
   const [userInput, setUserInput] = useState("");
@@ -55,28 +69,46 @@ const ChatPage = () => {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
-
   useEffect(() => {
     const userData = localStorage.getItem('userData');
     if (!userData) {
       navigate('/');
       return;
     }
-
+  
+    const locationState = location.state;
     
-
-    const createSession = async () => {
-      try {
-        const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-        const response = await axios.post(`${API_URL}/create-session`, { botId, username: userData.username || null });
-        setSessionId(response.data.id);
-      } catch (error) {
-        console.error('Error creating session:', error);
-        navigate('/');
-      }
-    };
-    createSession();
-  }, [navigate]);
+    if (locationState?.sessionId) {
+      setSessionId(locationState.sessionId);
+      const fetchSessionData = async () => {
+        try {
+          const response = await axios.get(`${API_URL}/api/chat/sessions/${locationState.sessionId}`);
+          console.log("Session data response:", response.data);
+          
+          if (response.data) {
+            if (response.data.messages && Array.isArray(response.data.messages)) {
+              const formattedMessages = filterMessages(response.data.messages)
+                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+                .map(msg => ({
+                  sender: msg.type?.toLowerCase() === 'user' ? 'user' : 'bot',
+                  content: msg.content || '',
+                  originalContent: msg.content || '',
+                  type: msg.isNamingPrompt ? 'NAMING_PROMPT' : msg.type
+                }));
+              setMessages(formattedMessages);
+            } else {
+              console.log("No messages found in session data");
+              setMessages([]);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching session data:', error);
+          setMessages([]);
+        }
+      };
+      fetchSessionData();
+    }
+  }, [navigate, location]);
 
   useEffect(() => {
     if (sttTriggered && userInput.trim() !== "" && !isWaitingForResponse) {
@@ -109,7 +141,7 @@ const ChatPage = () => {
         clearInterval(streamInterval);
         setIsWaitingForResponse(false);
       }
-    }, 25);
+    }, 40);
   };
 
   const sendMessage = async () => {
@@ -117,18 +149,25 @@ const ChatPage = () => {
     setIsWaitingForResponse(true);
 
     const isFirstMessage = messages.length === 0;
-    const newMessages = [...messages, { sender: 'user', content: userInput.trim() }];
+    const newUserMessage = { 
+      sender: 'user', 
+      content: userInput.trim()
+    };
+    
+    const newMessages = [...messages, newUserMessage];
     setMessages([...newMessages, { sender: 'bot', content: '' }]);
     setUserInput('');
 
     try {
       const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-      const response = await axios.post(`${API_URL}/respond`, { 
-        sessionId, 
-        content: userInput.trim(), 
+      const messageToSend = {
+        sessionId,
+        content: userInput.trim(),
         username: userData.username || null,
         isFirstMessage
-      });
+      };
+
+      const response = await axios.post(`${API_URL}/respond`, messageToSend);
       streamBotResponse(response.data.content);
     } catch (error) {
       console.error('Error sending message:', error);
@@ -174,7 +213,6 @@ const ChatPage = () => {
     }
   };
 
-
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       setIsRecording(false);
@@ -194,18 +232,14 @@ const ChatPage = () => {
 
   const sendAudioToSTT = async (base64Audio) => {
     try {
-      // Convert base64 back to blob
       const blob = base64ToBlob(base64Audio, 'audio/wav');
       
-      // Create FormData
       const formData = new FormData();
       formData.append('file', blob, 'recording.wav');
       formData.append('model', 'whisper-1');
   
-      // Get the API key from environment or a secure storage
       const REACT_APP_STT_API_KEY = process.env.REACT_APP_STT_API_KEY;
   
-      // Send request to Metis AI STT API
       const response = await axios.post(
         'https://api.metisai.ir/openai/v1/audio/transcriptions', 
         formData, 
@@ -248,6 +282,30 @@ const ChatPage = () => {
     return new Blob(byteArrays, { type: mime });
   };
 
+  const filterMessages = (messages) => {
+    const promptStart = "با توجه به متن گفتگوی زیر، یک عنوان کوتاه و مناسب";
+    const filteredMessages = [];
+    
+    const excludeIndices = new Set();
+    
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].content && messages[i].content.startsWith(promptStart)) {
+        excludeIndices.add(i);     
+        if (i > 0) {
+          excludeIndices.add(i-1);  
+        }
+      }
+    }
+    
+    for (let i = 0; i < messages.length; i++) {
+      if (!excludeIndices.has(i)) {
+        filteredMessages.push(messages[i]);
+      }
+    }
+    
+    return filteredMessages;
+  };
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -275,7 +333,7 @@ const ChatPage = () => {
         <div className="chat-box" ref={chatBoxRef}>
           {messages.map((msg, index) => (
             <div key={index} className={`message-container ${msg.sender}-container`}>
-              <MessageBubble content={msg.content} sender={msg.sender} />
+              <MessageBubble content={msg.content} sender={msg.sender} type={msg.type} />
             </div>
           ))}
           <div ref={messagesEndRef} />

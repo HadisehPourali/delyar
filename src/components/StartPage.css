@@ -117,9 +117,9 @@
     }
   
     .info-icon {
-        width: 100%; /* The image will scale based on the container's width */
-        max-width: 10px; /* You can set a maximum size */
-        height: auto; /* Maintain the aspect ratio */
+        width: 100%; 
+        max-width: 10px; 
+        height: auto; 
     }
       
   }
@@ -129,4 +129,25 @@
       margin-top: 20px;
       padding: 10px;
     }
+  }
+
+  .menu-button {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1001;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    background-color: #9ecedb;
+    border: none;
+    color: #224a8a;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .menu-button:hover {
+    background-color: #77b9cc;
   }

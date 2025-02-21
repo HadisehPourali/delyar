@@ -1,18 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthModal from './AuthModal';
 import './StartPage.css';
 import EmergencyContact from './EmergencyContact';
+import ChatSidebar from './ChatSidebar';
+import { Menu } from 'lucide-react';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_API_URL;
 
 const StartPage = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
-  
-  const handleChatClick = () => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const sidebarRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (isSidebarOpen && 
+          sidebarRef.current && 
+          !sidebarRef.current.contains(event.target) &&
+          !event.target.closest('.menu-button')) {
+        setIsSidebarOpen(false);
+      }
+    }
+    
+    if (isSidebarOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSidebarOpen]);
+
+  const handleChatClick = async () => {
     const userData = localStorage.getItem('userData');
     if (userData) {
-      navigate('/chat');
+      try {
+        const user = JSON.parse(userData);
+        const response = await axios.post(`${API_URL}/create-session`, { 
+          botId: process.env.REACT_APP_BOT_ID, 
+          username: user.username || null 
+        });
+        navigate('/chat', { state: { sessionId: response.data.id } });
+      } catch (error) {
+        console.error('Error creating session:', error);
+        setError('Failed to create a new chat session');
+      }
     } else {
       setIsModalOpen(true);
       setError('لطفا برای ادامه وارد شوید یا ثبت نام کنید');
@@ -34,7 +70,7 @@ const StartPage = () => {
       if (response.ok) {
         localStorage.setItem('userData', JSON.stringify(data.user));
         setError('');
-        navigate('/chat'); // Automatically redirect to chat after successful login
+        //navigate('/chat');
         return true;
       }
       setError(data.error || 'Login failed');
@@ -61,7 +97,7 @@ const StartPage = () => {
       if (response.ok) {
         localStorage.setItem('userData', JSON.stringify(data.user));
         setError('');
-        navigate('/chat'); // Automatically redirect to chat after successful signup
+        //navigate('/chat');
         return true;
       }
       setError(data.error || 'Signup failed');
@@ -72,14 +108,44 @@ const StartPage = () => {
       return false;
     }
   };
-  // Reset error when modal is closed
+
   const handleModalClose = () => {
     setError('');
     setIsModalOpen(false);
   };
 
+  const handleNewChat = () => {
+    handleChatClick();
+  };
+
+  const handleSelectChat = (chatData) => {
+    navigate('/chat', { 
+      state: { 
+        sessionId: chatData.id, 
+        messages: chatData.messages
+      }
+    });
+  };
+
   return (
     <div className="start-page">
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="menu-button"
+        >
+          <Menu size={24} />
+        </button>
+      )}
+
+      <ChatSidebar
+        ref={sidebarRef}
+        isOpen={isSidebarOpen}
+        toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        onNewChat={handleNewChat}
+        onSelectChat={handleSelectChat}
+      />
+
       <img 
         src="/images/avatar3.jpg" 
         alt="avatar" 
