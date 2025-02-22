@@ -5,6 +5,7 @@ import './ChatSidebar.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 const TITLE_GENERATION_MARKER = 'title_generated_';
+const TITLE_GENERATION_QUEUE = 'title_generation_queue';
 
 const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar }, ref) => {
   const [chats, setChats] = useState([]);
@@ -12,7 +13,19 @@ const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [pendingTitleGeneration, setPendingTitleGeneration] = useState([]);
+  const [pendingTitleGeneration, setPendingTitleGeneration] = useState(() => {
+    // Initialize from localStorage to prevent losing queue on reload
+    try {
+      return JSON.parse(localStorage.getItem(TITLE_GENERATION_QUEUE) || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  // Save queue to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(TITLE_GENERATION_QUEUE, JSON.stringify(pendingTitleGeneration));
+  }, [pendingTitleGeneration]);
 
   useEffect(() => {
     if (isOpen) {
@@ -25,14 +38,22 @@ const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar
     const generatePendingTitles = async () => {
       if (pendingTitleGeneration.length === 0) return;
       
-      // Process only one chat at a time to avoid overwhelming the API
+      // Process only one chat at a time
       const chatToProcess = pendingTitleGeneration[0];
       
       try {
+        // Double-check that title hasn't been generated while in queue
+        const titleGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + chatToProcess.id);
+        if (titleGenerated) {
+          setPendingTitleGeneration(prev => prev.filter(item => item.id !== chatToProcess.id));
+          return;
+        }
+
         const title = await generateTitleWithAI(chatToProcess.messages, chatToProcess.id);
         
-        localStorage.setItem(`chatTitle_${chatToProcess.id}`, title);
+        // Mark as generated before saving title to prevent race conditions
         localStorage.setItem(TITLE_GENERATION_MARKER + chatToProcess.id, 'true');
+        localStorage.setItem(`chatTitle_${chatToProcess.id}`, title);
         
         setChats(prevChats => 
           prevChats.map(chat => 
@@ -42,7 +63,7 @@ const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar
       } catch (error) {
         console.error(`Error generating title for chat ${chatToProcess.id}:`, error);
       } finally {
-        // Remove the processed chat from the queue
+        // Remove from queue regardless of success/failure
         setPendingTitleGeneration(prev => prev.filter(item => item.id !== chatToProcess.id));
       }
     };
@@ -96,8 +117,10 @@ const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar
 
   const fetchChatDetails = async (chatId) => {
     try {
-      // Check if we've already generated a title for this chat
+      // Check if title generation is already completed or in progress
       const titleGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + chatId);
+      const inQueue = pendingTitleGeneration.some(item => item.id === chatId);
+      
       const detailResponse = await axios.get(`${API_URL}/api/chat/sessions/${chatId}`);
       const messages = detailResponse.data.messages || [];
 
@@ -112,20 +135,15 @@ const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar
       
       // Only queue title generation if:
       // 1. We haven't generated a title before
-      // 2. There are messages to generate from
-      // 3. We don't already have a custom title
-      if (!titleGenerated && messages.length > 0 && !localStorage.getItem(`chatTitle_${chatId}`)) {
+      // 2. It's not already in the queue
+      // 3. There are messages to generate from
+      // 4. We don't already have a custom title
+      if (!titleGenerated && !inQueue && messages.length > 0 && title === 'گفتگوی جدید') {
         // Limit to first 5 messages for title generation
         const limitedMessages = messages.slice(0, 5);
         
         // Add to pending generation queue
-        setPendingTitleGeneration(prev => {
-          // Only add if not already in queue
-          if (!prev.some(item => item.id === chatId)) {
-            return [...prev, { id: chatId, messages: limitedMessages }];
-          }
-          return prev;
-        });
+        setPendingTitleGeneration(prev => [...prev, { id: chatId, messages: limitedMessages }]);
       }
 
       setChats(prevChats => prevChats.map(chat => 
@@ -135,16 +153,20 @@ const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar
       console.error(`Error fetching chat details for ${chatId}:`, error);
     }
   };
-
+  
   const generateTitleWithAI = async (messages, sessionId) => {
     try {
-      // Use only the first 5 messages for generating the title
+      // Final check before sending request
+      const titleGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + sessionId);
+      if (titleGenerated) {
+        return localStorage.getItem(`chatTitle_${sessionId}`) || 'گفتگوی جدید';
+      }
+
       const limitedMessages = messages.slice(0, 5);
       
       const messageHistory = limitedMessages
         .map(msg => {
           let content = msg.message?.content || msg.content || '';
-          // Remove the system note
           content = content.replace(/\[System Note:[\s\S]*?User message: /, '');
           return `${msg.message?.type === 'USER' || msg.type === 'USER' ? 'کاربر' : 'دلیار'}: ${content}`;
         })
