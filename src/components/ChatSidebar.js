@@ -161,24 +161,14 @@ const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar
       if (titleGenerated) {
         return localStorage.getItem(`chatTitle_${sessionId}`) || 'گفتگوی جدید';
       }
-
-      const limitedMessages = messages.slice(0, 5);
-      
-      const messageHistory = limitedMessages
-        .map(msg => {
-          let content = msg.message?.content || msg.content || '';
-          content = content.replace(/\[System Note:[\s\S]*?User message: /, '');
-          return `${msg.message?.type === 'USER' || msg.type === 'USER' ? 'کاربر' : 'دلیار'}: ${content}`;
-        })
-        .join('\n');
-
+  
       const titlePrompt = {
         message: {
-          content: `با توجه به متن گفتگوی زیر، یک عنوان کوتاه و مناسب (حداکثر 5 کلمه) برای این مکالمه پیشنهاد کن. فقط عنوان را بنویس، بدون هیچ توضیح اضافه:\n\n${messageHistory}`,
+          content: `با توجه به متن گفتگوی زیر، یک عنوان کوتاه و مناسب (حداکثر 5 کلمه) برای این مکالمه پیشنهاد کن. فقط عنوان را بنویس، بدون هیچ توضیح اضافه:\n\n`,
           type: "USER"
         }
       };
-
+  
       const response = await axios.post(
         `${API_URL}/respond`,
         {
@@ -187,7 +177,7 @@ const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar
           isFirstMessage: false
         }
       );
-
+  
       return response.data.content.trim();
     } catch (error) {
       console.error('Error generating title:', error);
