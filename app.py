@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import bcrypt
@@ -31,6 +31,18 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = True  # Enable SQL query logging
 
+# Create a static directory if it doesn't exist
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+if not os.path.exists(STATIC_DIR):
+    os.makedirs(STATIC_DIR)
+    logger.info(f"Created static directory at {STATIC_DIR}")
+
+# Create eNamad verification file
+ENAMAD_FILE = os.path.join(STATIC_DIR, '39639356.txt')
+with open(ENAMAD_FILE, 'w') as f:
+    f.write('')  # Create empty file
+    logger.info(f"Created eNamad verification file at {ENAMAD_FILE}")
+
 db = SQLAlchemy(app)
 
 # Chatbot configuration
@@ -62,6 +74,11 @@ class User(db.Model):
             'job': self.job,
             'disorder': self.disorder
         }
+
+# eNamad verification file route
+@app.route('/39639356.txt')
+def enamad_verification():
+    return send_from_directory(STATIC_DIR, '39639356.txt')
 
 @app.route('/api/chat/sessions', methods=['GET'])
 def get_chat_sessions():
