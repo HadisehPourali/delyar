@@ -250,7 +250,14 @@ def create_session():
         session_data = {
             "botId": bot_id,
             "user": user,
-            "initialMessages": None
+            "initialMessages":[
+                {
+                  "type": "AI",
+                  "content": """سلام دوست من! ✨
+خوشحالم که اومدی پیشم. من دلیار هستم، دوستی که هر وقت دلت خواست کنارته.
+چی تو دلت هست که دوست داری باهام درمیون بذاری؟ من اینجام که گوش کنم... ♥️"""
+                }
+              ]
         }
         
         response = requests.post(
