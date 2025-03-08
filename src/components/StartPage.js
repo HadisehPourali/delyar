@@ -4,7 +4,7 @@ import AuthModal from './AuthModal';
 import './StartPage.css';
 import EmergencyContact from './EmergencyContact';
 import ChatSidebar from './ChatSidebar';
-import { Menu } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -14,7 +14,19 @@ const StartPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState('');
   const sidebarRef = useRef(null);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const userData = localStorage.getItem('userData');
+    if (userData) {
+      const user = JSON.parse(userData);
+      setIsLoggedIn(true);
+      setUsername(user.username);
+    }
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -69,8 +81,9 @@ const StartPage = () => {
       
       if (response.ok) {
         localStorage.setItem('userData', JSON.stringify(data.user));
+        setIsLoggedIn(true);
+        setUsername(data.user.username);
         setError('');
-        //navigate('/chat');
         return true;
       }
       setError(data.error || 'Login failed');
@@ -96,8 +109,9 @@ const StartPage = () => {
       
       if (response.ok) {
         localStorage.setItem('userData', JSON.stringify(data.user));
+        setIsLoggedIn(true);
+        setUsername(data.user.username);
         setError('');
-        //navigate('/chat');
         return true;
       }
       setError(data.error || 'Signup failed');
@@ -107,6 +121,12 @@ const StartPage = () => {
       setError('An error occurred during signup');
       return false;
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('userData');
+    setIsLoggedIn(false);
+    setUsername('');
   };
 
   const handleModalClose = () => {
@@ -152,6 +172,16 @@ const StartPage = () => {
         className="avatar-image"
       />
 
+      {isLoggedIn && (
+        <div className="welcome-message">
+          <p className="welcome-text">
+            {`عزیز ${username} سلام`}
+            <br />
+            خوشحالم که اینجایی! دلیار همیشه آماده‌ی شنیدن حرف‌هات هست
+          </p>
+        </div>
+      )}
+
       <button 
         className="continue-button"
         onClick={handleChatClick}
@@ -161,24 +191,26 @@ const StartPage = () => {
         میتونی از اینجا شروع کنی
       </button>
 
-      <button 
-        className="auth-button"
-        onClick={() => setIsModalOpen(true)}
-        style={{
-          backgroundColor: '#9ecedb',
-          color: '#224a8a',
-          marginTop: '1rem',
-          padding: '0.8rem 1.5rem',
-          borderRadius: '20px',
-          border: 'none',
-          fontFamily: 'Vazirmatn',
-          cursor: 'pointer'
-        }}
-        onMouseEnter={(e) => e.target.style.backgroundColor = '#77b9cc'}
-        onMouseLeave={(e) => e.target.style.backgroundColor = '#9ecedb'}
-      >
-        ورود / عضویت
-      </button>
+      {!isLoggedIn ? (
+        <button 
+          className="auth-button"
+          onClick={() => setIsModalOpen(true)}
+          style={{
+            backgroundColor: '#9ecedb',
+            color: '#224a8a',
+            marginTop: '1rem',
+            padding: '0.8rem 1.5rem',
+            borderRadius: '20px',
+            border: 'none',
+            fontFamily: 'Vazirmatn',
+            cursor: 'pointer'
+          }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#77b9cc'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#9ecedb'}
+        >
+          ورود / عضویت
+        </button>
+      ) : null}
 
       <div className="info-box">
         <img 
@@ -194,6 +226,35 @@ const StartPage = () => {
           (: و کمکت میکنم حالت بهتر شه
         </p>
       </div>
+
+      {isLoggedIn && (
+        <button 
+          className="logout-button"
+          onClick={handleLogout}
+          style={{
+            position: 'fixed',
+            bottom: '1rem',
+            right: '1rem',
+            backgroundColor: '#9ecedb',
+            color: '#224a8a',
+            padding: '0.5rem 1rem',
+            borderRadius: '20px',
+            border: 'none',
+            fontFamily: 'Vazirmatn',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            boxShadow: '0 2px 5px rgba(0, 0, 0, 0.2)',
+            transition: 'all 0.3s ease'
+          }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#77b9cc'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#9ecedb'}
+        >
+          <LogOut size={16} />
+          خروج
+        </button>
+      )}
 
       <AuthModal 
         isOpen={isModalOpen}
