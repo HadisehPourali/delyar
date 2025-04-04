@@ -1,0 +1,147 @@
+/* ==========================================================================
+   PaymentModal Specific Styles
+   ========================================================================== */
+
+/* Use variables defined in StartPage.css or a global scope */
+:root {
+  /* Re-declare or import variables if this file is loaded independently */
+  --primary-color: #224a8a;
+  --secondary-color: #0f3470;
+  --text-dark: #333333;
+  --text-secondary: #555555;
+  --font-family: 'Vazirmatn', sans-serif;
+  --border-color: #ced4da;
+  --modal-z-index: 1100;
+  --overlay-z-index: 1099;
+}
+
+
+/* Overlay specific to payment modal if needed, otherwise rely on base */
+.payment-modal-overlay {
+  position: fixed; inset: 0;
+  background-color: rgba(0, 0, 0, 0.65);
+  display: flex; justify-content: center; align-items: center;
+  z-index: var(--overlay-z-index);
+  padding: 15px;
+  backdrop-filter: blur(3px);
+  animation: fadeInOverlay 0.3s ease; /* Reuse animation from base */
+}
+
+/* Payment Modal container */
+.payment-modal {
+  /* Base styles needed if not inheriting */
+  background-color: #fff;
+  padding: 25px 30px;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  max-width: 90%;
+  width: 380px; /* Specific width */
+  text-align: center; /* Center content */
+  font-family: var(--font-family);
+  color: var(--text-dark);
+  position: relative;
+  z-index: var(--modal-z-index);
+  animation: fadeInModal 0.3s ease-out; /* Reuse animation */
+  direction: rtl;
+}
+
+.payment-modal h2 {
+  margin-top: 0;
+  margin-bottom: 10px; /* Less space below h2 */
+  color: var(--secondary-color);
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.payment-modal p {
+  margin-bottom: 15px; /* Standard paragraph margin */
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* Session Selector specific styles */
+.payment-modal .session-selector {
+  margin: 25px 0; /* More vertical margin */
+  padding: 15px 0;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+
+.payment-modal .session-selector label {
+  margin-left: 10px; /* Margin on left in RTL */
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--text-dark);
+}
+
+.payment-modal .session-selector select {
+  padding: 8px 12px;
+  font-family: var(--font-family);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  min-width: 80px; /* Minimum width for select */
+  font-size: 1rem;
+  cursor: pointer;
+}
+.payment-modal .session-selector select:focus {
+    border-color: var(--secondary-color);
+    outline: none;
+}
+
+
+/* Payment amount display */
+.payment-modal p:last-of-type { /* Target the amount paragraph */
+    font-weight: bold;
+    font-size: 1.1em;
+    color: var(--primary-color);
+    margin-top: 20px;
+}
+
+/* Payment Modal Actions */
+.payment-modal .modal-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 25px;
+  gap: 10px;
+  padding-top: 0; /* No top padding needed */
+  border-top: none; /* No border needed */
+}
+
+/* Payment Modal Buttons (using base classes defined in StartPage.css is better)*/
+/* If StartPage.css isn't guaranteed, define specific buttons */
+.payment-modal .modal-actions button {
+  flex-grow: 1; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer;
+  font-family: var(--font-family); font-size: 15px; font-weight: 500;
+  transition: background-color 0.2s, opacity 0.2s, transform 0.1s ease;
+  max-width: 48%;
+}
+.payment-modal .modal-actions button:active:not(:disabled) { transform: translateY(0); }
+.payment-modal .modal-actions button:hover:not(:disabled) { transform: translateY(-1px); }
+.payment-modal .modal-actions button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.payment-modal .modal-actions button:first-child { /* Cancel */
+  background-color: #f0f0f0; color: var(--text-secondary); order: 1;
+}
+.payment-modal .modal-actions button:first-child:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+.payment-modal .modal-actions button:last-child { /* Confirm/Pay */
+  background-color: var(--primary-color); color: var(--text-light); order: 2;
+}
+.payment-modal .modal-actions button:last-child:hover:not(:disabled) {
+  background-color: var(--secondary-color);
+}
+
+
+/* Keyframes if not defined globally */
+@keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+/* Responsive adjustments specific to payment modal if needed */
+@media (max-width: 480px) {
+    .payment-modal { padding: 20px 15px; }
+    .payment-modal .session-selector { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .payment-modal .session-selector label { margin-left: 0; margin-bottom: 5px; }
+    .payment-modal .modal-actions { flex-direction: column-reverse; gap: 8px; }
+    .payment-modal .modal-actions button { max-width: 100%; }
+}

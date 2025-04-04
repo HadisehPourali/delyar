@@ -1,199 +1,466 @@
+/* ==========================================================================
+   StartPage Styles
+   ========================================================================== */
+
+/* --- CSS Variables (Example - Define these in :root or replace) --- */
+:root {
+  --primary-color: #224a8a; /* Dark Blue */
+  --secondary-color: #0f3470; /* Darker Blue */
+  --accent-color-light: #9ecedb; /* Light Blue */
+  --accent-color-medium: #77b9cc; /* Medium Blue */
+  --text-light: #ffffff;
+  --text-dark: #333333;
+  --text-secondary: #555555;
+  --background-light: #f8f9fa;
+  --border-color: #ced4da;
+  --error-color: #c62828; /* Red */
+  --success-color: #2e7d32; /* Green */
+  --warning-color: #ef6c00; /* Orange */
+  --info-color: #00796b; /* Teal */
+  --font-family: 'Vazirmatn', sans-serif;
+  --header-height: 60px;
+  --modal-z-index: 1100;
+  --overlay-z-index: 1099;
+  --message-z-index: 1200;
+  --sos-button-z-index: 1001;
+  --sos-popup-z-index: 1002;
+  --logout-button-z-index: 1000;
+}
+
+/* --- General Page Styles --- */
 .start-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: #224a8a;
+  background-color: var(--primary-color);
   min-height: 100vh;
-  color: #fff;
+  color: var(--text-light);
   padding: 20px;
+  padding-top: calc(var(--header-height) + 20px); /* Space below fixed header */
   box-sizing: border-box;
+  overflow-x: hidden;
+  font-family: var(--font-family);
 }
 
-.avatar-image {
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  object-fit: cover;
-}
-
-.continue-button {
-  font-family: 'Vazirmatn';
-  padding: 12px 25px;
-  margin-top: 30px;
-  background-color: #9ecedb;
-  border: none;
-  border-radius: 30px;
-  color: #224a8a;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  transition: background-color 0.3s;
-}
-
-.info-box {
-  margin-top: 50px;
-  width: 100%;
-  max-width: 300px;
-  background-color: #9ecedb;
-  border: 2px solid #224a8a;
-  border-radius: 10px;
-  color: #224a8a;
+/* --- Header --- */
+.header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--header-height);
+  background-color: var(--primary-color);
+  padding: 0 20px; /* Use padding for spacing */
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  text-align: center;
-  padding: 15px;
-  font-size: 16px;
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
-  animation: fadeIn 3s ease-in-out;
-}
-
-.info-icon {
-  width: 100px;
-  height: 100px;
-  margin-bottom: 10px;
-  object-fit: contain;
-}
-
-.info-text {
-  opacity: 0;
-  animation: fadeSlideIn 2s forwards;
-  margin: 0;
-  padding: 10px;
-}
-
-/* Welcome message styles */
-.welcome-message {
-  margin-top: 20px;
-  padding: 15px;
-  background-color: rgba(158, 206, 219, 0.2);
-  border-radius: 15px;
-  text-align: center;
-  max-width: 80%;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  animation: fadeSlideIn 1s forwards;
-}
-
-.welcome-text {
-  font-family: 'Vazirmatn';
-  font-size: 18px;
-  color: #fff;
-  margin: 0;
-  line-height: 1.6;
-}
-
-.logout-button:hover {
-  background-color: #77b9cc;
-  transform: translateY(-2px);
-}
-
-@keyframes fadeSlideIn {
-  0% {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Media Queries for StartPage */
-@media (max-width: 768px) {
-  .avatar-image {
-    width: 150px;
-    height: 150px;
-  }
-
-  .continue-button {
-    font-size: 16px;
-    padding: 10px 20px;
-  }
-
-  .info-box {
-    max-width: 280px;
-    margin-top: 30px;
-  }
-
-  .info-icon {
-    width: 80px;
-    height: 80px;
-  }
-  
-  .welcome-message {
-    max-width: 90%;
-    padding: 10px;
-  }
-  
-  .welcome-text {
-    font-size: 16px;
-  }
-}
-
-@media (max-width: 480px) {
-  .avatar-image {
-    width: 120px;
-    height: 120px;
-  }
-
-  .continue-button {
-    font-size: 14px;
-    padding: 8px 16px;
-  }
-
-  .info-box {
-    max-width: 250px;
-    font-size: 14px;
-  }
-
-  .info-icon {
-      width: 100%; 
-      max-width: 10px; 
-      height: auto; 
-  }
-  
-  .welcome-message {
-    max-width: 95%;
-    padding: 8px;
-  }
-  
-  .welcome-text {
-    font-size: 14px;
-  }
-}
-
-@media (max-height: 600px) {
-  .info-box {
-    margin-top: 20px;
-    padding: 10px;
-  }
-  
-  .welcome-message {
-    margin-top: 10px;
-  }
+  color: var(--text-light);
+  font-family: var(--font-family);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  z-index: 999; /* Below buttons/modals */
 }
 
 .menu-button {
-  position: fixed;
-  top: 1rem;
-  left: 1rem;
-  z-index: 1001;
   padding: 0.5rem;
-  border-radius: 0.375rem;
-  background-color: #9ecedb;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.15);
   border: none;
-  color: #224a8a;
+  color: var(--text-light);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .menu-button:hover {
-  background-color: #77b9cc;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.wallet-info {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* Increased gap */
+}
+
+.wallet-balance {
+  font-size: 15px;
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 6px 12px; /* Adjusted padding */
+  border-radius: 15px;
+  white-space: nowrap; /* Prevent wrapping */
+}
+
+/* Shared style for header action buttons */
+.header .topup-button,
+.header .purchase-session-button,
+.header .profile-button,
+.header .auth-button-header {
+  padding: 8px 15px;
+  background-color: var(--accent-color-light);
+  color: var(--secondary-color);
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: background-color 0.3s, transform 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px; /* Space between icon and text */
+  white-space: nowrap;
+}
+.header .topup-button:hover,
+.header .purchase-session-button:hover,
+.header .profile-button:hover,
+.header .auth-button-header:hover {
+  background-color: var(--accent-color-medium);
+  transform: translateY(-1px);
+}
+.header .topup-button:disabled,
+.header .purchase-session-button:disabled,
+.header .profile-button:disabled,
+.header .auth-button-header:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+}
+.header .profile-button .incomplete-indicator {
+  color: red;
+  margin-right: 4px; /* Use margin-right in RTL */
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+/* --- Main Content Elements --- */
+.avatar-image {
+  width: clamp(140px, 30vw, 180px); /* Adjusted size */
+  height: clamp(140px, 30vw, 180px);
+  border-radius: 50%;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+  object-fit: cover;
+  margin-bottom: 25px; /* Increased space */
+}
+
+.welcome-message {
+  margin-top: 0; /* Remove top margin */
+  margin-bottom: 30px; /* Increase space */
+  padding: 15px 25px;
+  background-color: rgba(158, 206, 219, 0.15);
+  border-radius: 15px;
+  text-align: center;
+  max-width: 90%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+.welcome-text {
+  font-size: clamp(17px, 3.5vw, 19px); /* Slightly larger */
+  color: var(--text-light);
+  margin: 0;
+  line-height: 1.7;
+}
+
+.continue-button,
+.auth-button {
+  font-family: var(--font-family);
+  padding: 12px 35px; /* Adjusted padding */
+  margin-top: 15px; /* Consistent margin */
+  border: none;
+  border-radius: 30px;
+  font-size: clamp(16px, 3vw, 18px); /* Larger */
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s, transform 0.2s, box-shadow 0.2s;
+  text-align: center;
+  display: inline-flex; /* For icon alignment */
+  align-items: center;
+  justify-content: center;
+}
+.continue-button {
+  background-color: var(--accent-color-light);
+  color: var(--secondary-color);
+}
+.continue-button:hover:not(:disabled) {
+  background-color: var(--accent-color-medium);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+.auth-button {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-light);
+  gap: 8px;
+}
+.auth-button:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+.continue-button:disabled,
+.auth-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Info Box */
+.info-box {
+  margin-top: 45px; /* Increased space */
+  width: 100%;
+  max-width: 340px; /* Slightly wider */
+  background-color: rgba(158, 206, 219, 0.1);
+  border: 1px solid rgba(158, 206, 219, 0.3);
+  border-radius: 10px;
+  color: #e0f2f7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 25px; /* Increased padding */
+  font-size: clamp(15px, 2.5vw, 16px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.info-icon {
+  width: 60px; height: 60px; margin-bottom: 15px;
+  object-fit: contain; opacity: 0.8;
+}
+.info-text { margin: 0; line-height: 1.7; }
+
+/* --- Status Message Display --- */
+#status-message-display {
+  box-sizing: border-box;
+  position: fixed !important;
+  top: 20px !important; /* Keep it high */
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: auto;
+  min-width: 300px;
+  max-width: min(600px, 90vw);
+  padding: 12px 25px;
+  border-radius: 8px;
+  text-align: center;
+  font-family: var(--font-family);
+  font-size: 15px;
+  font-weight: 500;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+  z-index: 9999 !important; /* Highest z-index */
+  border: 1px solid transparent;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+  opacity: 1; visibility: visible;
+  bottom: auto !important; right: auto !important; margin: 0 !important;
+}
+#status-message-display.info { background-color: #e0f7fa; color: var(--info-color); border-color: #b2ebf2; }
+#status-message-display.success { background-color: #e8f5e9; color: var(--success-color); border-color: #c8e6c9; }
+#status-message-display.warning { background-color: #fff3e0; color: var(--warning-color); border-color: #ffe0b2; }
+#status-message-display.error { background-color: #ffebee; color: var(--error-color); border-color: #ffcdd2; }
+
+
+/* ==========================================================================
+   Base Modal Styles (Used by Auth, Confirm, Profile, Feedback etc.)
+   ========================================================================== */
+
+   .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.7); /* Darker */
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1100; /* Ensure consistent z-index */
+    padding: 15px;
+    backdrop-filter: blur(3px);
+    animation: fadeInOverlay 0.3s ease;
+  }
+  
+  .modal {
+    background-color: var(--text-light);
+    padding: 0; /* Remove base padding, handle with content/actions */
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    max-width: 90%;
+    width: 420px; /* Default width, specific modals can override */
+    text-align: right; direction: rtl;
+    font-family: var(--font-family);
+    color: var(--text-dark);
+    /* --- REMOVE position: relative; --- */
+    /* position: relative; */
+    animation: fadeInModal 0.3s ease-out;
+    z-index: 1101; /* Ensure modals are above overlay */
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh; /* Limit height */
+    overflow: hidden; /* Hide overflow on main modal container */
+  }
+  
+  /* --- Modal Content Area (Scrollable) --- */
+  .modal-content {
+      padding: 25px 30px; /* Apply padding here */
+      overflow-y: auto; /* Allow ONLY this part to scroll */
+      flex-grow: 1; /* Allow content to take available space */
+  }
+  .modal-content > *:last-child {
+     margin-bottom: 0; /* Remove margin from last item in content */
+  }
+  .modal-content h3 { /* Target h3 inside content */
+      margin-top: 0; margin-bottom: 15px; text-align: center; font-size: 1.25em; color: var(--secondary-color);
+  }
+  .modal-content p { /* Target p inside content */
+      margin-bottom: 20px; text-align: center; line-height: 1.6; color: var(--text-secondary); font-size: 15px;
+  }
+  .modal-content form { margin: 0; padding: 0; } /* Reset form margins inside */
+  .modal-content .form-group { margin-bottom: 18px; text-align: right; }
+  /* ... other form element styles ... */
+  .modal-content label { display: block; margin-bottom: 6px; font-weight: 500; color: #444; font-size: 14px; }
+  .modal-content input[type="text"], .modal-content input[type="tel"], .modal-content input[type="email"],
+  .modal-content input[type="password"], .modal-content select, .modal-content textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px;
+    font-size: 15px; box-sizing: border-box; font-family: var(--font-family); transition: border-color 0.2s ease; background-color: #fdfdfd;
+  }
+  .modal-content input:focus, .modal-content select:focus, .modal-content textarea:focus { border-color: var(--secondary-color); outline: none; }
+  .modal-content input[type="tel"] { direction: ltr; text-align: right; }
+  .modal-content input#otp { text-align: center; letter-spacing: 3px; }
+  .modal-content textarea { resize: vertical; min-height: 80px; }
+  
+  
+  /* --- Modal Actions (Fixed Footer) --- */
+  .modal-actions {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 15px 30px; /* Padding for actions area */
+    border-top: 1px solid #eee; /* Separator line */
+    background-color: #f8f9fa; /* Optional subtle background */
+    gap: 10px;
+    margin-top: 0; /* Remove margin, padding handles space */
+  }
+  
+  /* ... (Modal Button Base Styles & Specific Styles remain the same) ... */
+  .modal button { flex-grow: 1; padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-family: var(--font-family); font-size: 15px; font-weight: 500; transition: background-color 0.2s, opacity 0.2s, transform 0.1s ease; }
+  .modal button:hover:not(:disabled) { transform: translateY(-1px); }
+  .modal button:active:not(:disabled) { transform: translateY(0); }
+  .modal button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .modal .confirm-button { background-color: var(--primary-color); color: var(--text-light); order: 2; }
+  .modal .confirm-button:hover:not(:disabled) { background-color: var(--secondary-color); }
+  .modal .cancel-button { background-color: #f0f0f0; color: var(--text-secondary); order: 1; }
+  .modal .cancel-button:hover:not(:disabled) { background-color: #e0e0e0; }
+  .modal .confirm-button[style*="background-color: #28a745"] { background-color: #28a745 !important; }
+  .modal .confirm-button[style*="background-color: #28a745"]:hover:not(:disabled) { background-color: #218838 !important; }
+  
+  /* --- Modal Error Message (Position inside modal-content or actions) --- */
+  .modal .error-message {
+    color: var(--error-color); margin-bottom: 15px; margin-top: 0; /* Adjust based on placement */
+    font-size: 14px; text-align: center; min-height: 1.2em; padding: 0 10px; /* Add padding */
+  }
+  
+  .footer-info {
+    margin-top: 40px; /* Space above the footer content */
+    margin-bottom: 80px; /* Extra space below, keeping it above fixed logout */
+    padding-bottom: 20px; /* Optional padding if needed */
+    text-align: center;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px; /* Space between email and logo */
+  }
+  
+  .support-email {
+    font-size: 14px;
+    color: var(--accent-color-light); /* Use a lighter color from your theme */
+    margin: 0;
+  }
+  
+  .support-email a {
+    color: inherit; /* Use the parent's color */
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+  
+  .support-email a:hover {
+    color: var(--text-light); /* Brighten on hover */
+    text-decoration: underline;
+  }
+  
+  .enamad-logo img {
+    max-width: 100px; /* Control the logo size */
+    height: auto;
+    display: block; /* Prevent extra space */
+    opacity: 0.9;
+    transition: opacity 0.2s ease;
+  }
+  
+  .enamad-logo a:hover img {
+    opacity: 1;
+  }
+
+/* --- Specific Modal Type Styles --- */
+.auth-modal { max-width: 400px; }
+.auth-modal .edit-phone-button { width: 100%; margin-top: 10px; font-size: 14px; color:#555; background: none; border: none; cursor: pointer; text-align: center; padding: 5px; }
+.auth-modal .edit-phone-button:hover { color: #007bff; text-decoration: underline;}
+
+.profile-modal { max-width: 480px; }
+.incomplete-indicator { color: red; margin-left: 4px; font-weight: bold; font-size: 1.1em; vertical-align: middle; }
+
+.feedback-form-container { max-width: 450px; }
+.feedback-form-container .star-rating { display: flex; justify-content: center; margin-bottom: 20px; }
+
+.payment-modal { max-width: 380px; }
+.payment-modal .session-selector label { margin-right: 10px; font-weight: 500; }
+.payment-modal select { padding: 8px; font-family: var(--font-family); border-radius: 5px; margin-left: 10px; border: 1px solid var(--border-color); }
+
+/* --- Feedback Section --- */
+.feedback-section { margin-top: 35px; width: 100%; display: flex; justify-content: center; }
+.feedback-toggle-button {
+  font-family: var(--font-family); padding: 10px 20px; background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--accent-color-light); border-radius: 20px; color: var(--text-light);
+  font-size: 15px; cursor: pointer; transition: background-color 0.3s; display: inline-flex; align-items: center; gap: 8px;
+}
+.feedback-toggle-button:hover { background-color: rgba(255, 255, 255, 0.3); }
+
+/* --- Logout Button --- */
+.logout-button {
+  position: fixed; bottom: 20px; right: 20px; top: auto; left: auto;
+  z-index: var(--logout-button-z-index); /* Use variable */
+  background-color: rgba(255, 255, 255, 0.1); color: var(--text-light); padding: 0.6rem 1.1rem;
+  border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.3); font-family: var(--font-family);
+  cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; font-size: 14px;
+}
+.logout-button:hover { background-color: rgba(255, 255, 255, 0.25); transform: translateY(-1px); }
+
+/* --- Animations --- */
+@keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+/* --- Media Queries --- */
+@media (max-width: 768px) {
+  .header { padding: 10px 15px; height: 55px; }
+  .start-page { padding-top: 70px; }
+  .wallet-info { gap: 8px; }
+  .wallet-balance { font-size: 14px; padding: 4px 8px; }
+  .header .topup-button, .header .purchase-session-button,
+  .header .profile-button, .header .auth-button-header { padding: 7px 12px; font-size: 13px; }
+  .modal { max-width: 95%; padding: 20px 25px; }
+}
+
+@media (max-width: 480px) {
+  :root { --header-height: 50px; } /* Adjust variable */
+  .start-page { padding-top: 65px; }
+  .wallet-info { flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+  .wallet-balance { order: 3; width: 100%; text-align: center; margin-top: 5px; }
+  .header .topup-button, .header .purchase-session-button,
+  .header .profile-button, .header .auth-button-header { padding: 6px 10px; font-size: 12px; }
+  .modal { width: 95%; padding: 20px 15px; }
+  .modal h3 { font-size: 1.1em; }
+  .modal p { font-size: 14px; }
+  .modal button { font-size: 14px; padding: 9px 15px; max-width: 100%; }
+  .modal-actions { flex-direction: column-reverse; gap: 8px; } /* Stack buttons vertically */
+  .info-box { margin-top: 30px; padding: 15px; }
+  .footer-info {
+    margin-top: 30px;
+    margin-bottom: 70px; /* Adjust if needed */
+    gap: 10px;
+  }
+  .support-email {
+    font-size: 13px;
+  }
+   .enamad-logo img {
+      max-width: 80px; /* Slightly smaller logo on mobile */
+   }
 }

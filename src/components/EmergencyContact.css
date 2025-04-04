@@ -1,116 +1,173 @@
-.emergency-contact {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  text-align: center;
+/* --- EmergencyContact.css --- */
+
+/* Using CSS variables for consistency (optional but recommended) */
+:root {
+  --sos-button-size: 50px;
+  --sos-button-color: #ff4444;
+  --sos-button-hover-color: #cc0000;
+  --sos-popup-z-index: 1002;
+  --sos-button-z-index: 1001;
+  --logout-button-z-index: 1000; /* Should be lower than SOS */
+  --header-height: 60px; /* Approximate header height */
+  --button-margin: 20px; /* Consistent margin from edges */
+  --font-family: 'Vazirmatn', sans-serif;
 }
 
+/* SOS Button - Explicit Top-Right Positioning */
 .sos-button {
-  background-color: #ff4444;
-  color: white;
-  padding: clamp(6px, 2vw, 10px) clamp(10px, 3vw, 20px);
-  border: none;
-  border-radius: 10px;
-  font-family: 'Vazirmatn', sans-serif;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  font-size: clamp(10px, 2.5vw, 18px);
-  position: fixed;
-  top: clamp(10px, 2vh, 20px);
-  right: clamp(10px, 2vw, 20px);
-  z-index: 1000;
-}
+  position: fixed !important; /* Use !important to override potential conflicts */
+  top: calc(var(--header-height) + 15px); /* Position below the header + a gap */
+  right: var(--button-margin);
+  bottom: auto !important; /* Ensure no bottom alignment */
+  left: auto !important; /* Ensure no left alignment */
+  z-index: var(--sos-button-z-index) !important; /* Ensure correct stacking */
 
-.supportive-message {
-  font-size: clamp(18px, 2.5vw, 24px);
-  margin-top: clamp(20px, 4vh, 30px);
-  padding-top: 15px;
-  border-top: 1px solid #eee;
-  display: block;
+  width: var(--sos-button-size);
+  height: var(--sos-button-size);
+  border-radius: 50%; /* Circular */
+  background-color: var(--sos-button-color);
+  color: white;
+  border: none;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.2s;
+  font-size: 15px; /* Adjusted font size */
+  font-weight: bold;
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.25);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0; /* Remove padding if using fixed size */
+  line-height: var(--sos-button-size); /* Center text vertically */
   text-align: center;
-  color: #224a8a;
 }
 
 .sos-button:hover {
-  background-color: #cc0000;
+  background-color: var(--sos-button-hover-color);
+  transform: scale(1.05);
 }
 
+/* The Popup List - Positioned relative to the Top-Right Button */
 .contact-list {
-  position: fixed;
-  top: clamp(60px, 10vh, 100px);
-  right: clamp(10px, 2vw, 20px);
+  position: fixed; /* Keep fixed */
+  top: calc(var(--header-height) + 15px + var(--sos-button-size) + 10px); /* Below SOS button (top + button height + gap) */
+  right: var(--button-margin); /* Align with SOS button */
+  z-index: var(--sos-popup-z-index) !important; /* Above SOS button */
+
   background-color: white;
   border: 1px solid #ccc;
   border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  padding: clamp(15px, 3vw, 25px);
-  font-family: 'Vazirmatn', sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 20px 25px; /* More padding */
+  font-family: var(--font-family);
   text-align: right;
   direction: rtl;
-  animation: fadeIn 0.3s ease-in-out;
-  color: #224a8a;
-  width: clamp(200px, 90vw, 300px);
-  z-index: 999;
+  color: #333;
+  width: clamp(260px, 70vw, 340px); /* Slightly wider */
+
+  /* Initial Hidden State & Transition */
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95); /* Start slightly up */
+  transition: opacity 0.25s ease-in-out, transform 0.25s ease-in-out;
+  pointer-events: none;
 }
 
-.contact-list p {
-  font-size: 16px;
-  margin-bottom: 10px;
+/* Show the list when .visible class is added */
+.contact-list.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+.contact-list p:first-of-type { /* Style the intro paragraph */
+  font-size: 1rem;
+  margin-top: 0; /* Remove top margin if any */
+  margin-bottom: 15px;
   color: #224a8a;
+  font-weight: 500;
+  text-align: center;
 }
 
 .contact-list ul {
   list-style-type: none;
   padding: 0;
+  margin: 0 0 15px 0;
 }
 
 .contact-list li {
-  margin-bottom: 5px;
-  font-size: 14px;
-  color: #224a8a;
+  margin-bottom: 10px; /* Increased spacing */
+  font-size: 0.95rem;
+  color: #333;
+  line-height: 1.5;
+}
+.contact-list li strong {
+    color: #0f3470; /* Darker blue */
+    margin-left: 8px;
 }
 
 .phone-number {
-  color: red;
+  color: #d90429; /* Emergency red */
   text-decoration: none;
+  font-weight: bold;
+  font-size: 1rem;
+  direction: ltr;
+  display: inline-block;
+  margin-right: 5px;
+  padding: 2px 4px; /* Add slight padding */
+  border-radius: 3px;
+  background-color: rgba(255, 68, 68, 0.05); /* Very subtle background */
 }
-
 .phone-number:hover {
   text-decoration: underline;
+  color: #a0001c;
+  background-color: rgba(255, 68, 68, 0.1);
 }
 
-.close-button {
+.supportive-message {
+  font-size: 1.1rem; /* Adjusted size */
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+  display: block;
+  text-align: center;
+  color: #224a8a;
+  font-weight: bold;
+}
+
+/* Close button positioning */
+.contact-list .close-button {
   position: absolute;
-  top: 1px;
-  left: 1px;
+  top: 8px;
+  left: 8px; /* Top-left corner */
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: 26px; /* Slightly larger */
+  line-height: 1;
   cursor: pointer;
-  color: #ff4444;
-  outline: none;
+  color: #aaa;
+  padding: 5px;
+  transition: color 0.2s ease;
+}
+.contact-list .close-button:hover {
+   color: #555;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
+/* Media Queries (Adjust if needed, but base is now top-right) */
 @media (max-width: 480px) {
-  .contact-list {
-    right: 50%;
-    transform: translateX(50%);
-    width: 90%;
-    max-width: none;
-  }
-  
-  .sos-button {
-    right: 10px;
-  }
+    /* Keep button top-right, maybe adjust margins slightly */
+    .sos-button {
+        top: calc(var(--header-height) + 10px); /* Slightly less space */
+        right: 15px;
+        width: 45px;
+        height: 45px;
+        line-height: 45px;
+        font-size: 14px;
+    }
+    /* Position list below the smaller button */
+    .contact-list {
+        top: calc(var(--header-height) + 10px + 45px + 10px); /* Adjust */
+        right: 15px; /* Align */
+        width: calc(100vw - 30px); /* Full width minus margins */
+        max-width: 300px; /* Max width */
+    }
 }

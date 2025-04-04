@@ -1,53 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Mic, MicOff } from 'lucide-react';
+import { Mic, MicOff, Send } from 'lucide-react';
 import './ChatPage.css';
+import './PaymentModal.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
 const MessageBubble = ({ content, sender, type }) => {
-  // Don't render system messages
-  if (type === 'SYSTEM' || type === 'NAMING_PROMPT') {
-    return null;
-  }
-
-  // Filter out system notes if present in user message
-  const displayContent = sender === 'user' 
-    ? content.replace(/\[System Note:[\s\S]*?User message: /, '').trim()
-    : content;
-
-  // Don't render empty messages
-  if (!displayContent) {
-    return null;
-  }
-
+  if (type === 'SYSTEM' || type === 'NAMING_PROMPT') return null;
+  
+  // Handle content more carefully
+  // Don't manipulate content unless absolutely necessary
+  const displayContent = sender === 'user'
+    ? (content || '').replace(/\[یادداشت سیستمی:.*?\]\n\nپیام کاربر:\s*/, '')
+    : (content || '');
+    
+  // Only return null if there's truly nothing to display
+  if (!displayContent && displayContent !== 0) return null;
+  
   return (
-    <div 
-      className={`message-bubble ${sender}`}
-      style={{ 
-        fontFamily: 'Vazirmatn', 
-        textAlign: 'right', 
-        direction: 'rtl'
-      }}
-    >
-      <ReactMarkdown
-        components={{
-          p: ({ node, ...props }) => (
-            <p style={{ margin: '0.5em 0' }} {...props} />
-          ),
-          strong: ({ node, ...props }) => (
-            <strong style={{ fontWeight: 'bold' }} {...props} />
-          ),
-          em: ({ node, ...props }) => (
-            <em style={{ fontStyle: 'italic' }} {...props} />
-          ),
-          br: () => <br />,
-        }}
-      >
-        {displayContent}
-      </ReactMarkdown>
+    <div className={`message-container ${sender}-container`}>
+      <div className={`message-bubble ${sender}`} style={{ fontFamily: 'Vazirmatn', textAlign: 'right', direction: 'rtl' }}>
+        <ReactMarkdown>{String(displayContent)}</ReactMarkdown>
+      </div>
     </div>
   );
 };
@@ -55,352 +32,555 @@ const MessageBubble = ({ content, sender, type }) => {
 const ChatPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // --- State ---
   const [messages, setMessages] = useState([]);
-  const [sttTriggered, setSttTriggered] = useState(false);
-  const [userInput, setUserInput] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const [sessionId, setSessionId] = useState(null);
-  const [showRecordingText, setShowRecordingText] = useState(false);
+  const [userInput, setUserInput] = useState('');
+  const [sessionId, setSessionId] = useState(location.state?.sessionId || null);
   const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showRecordingText, setShowRecordingText] = useState(false);
+  const [availableMinutes, setAvailableMinutes] = useState(0); // New state for purchased minutes
+  const [showNextSessionPrompt, setShowNextSessionPrompt] = useState(false); // Prompt for next session
+
+  // --- Refs ---
+  const chatBoxRef = useRef(null);
+  const inputRef = useRef(null);
+  const messageTimeoutRef = useRef(null);
+  const userHasScrolledUpRef = useRef(false);
+  const intervalRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const botId = process.env.REACT_APP_BOT_ID;
-  const chatBoxRef = useRef(null);
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
+  const isInitialMount = useRef(true);
 
+  const SESSION_PRICE = parseInt(process.env.REACT_APP_SESSION_PRICE, 10) || 39000;
+
+  // --- Helper Functions ---
+  const showStatusMessage = useCallback((msg, duration = 4000, type = 'info') => {
+    setMessage({ text: msg, type });
+    if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+    messageTimeoutRef.current = setTimeout(() => setMessage(null), duration);
+  }, []);
+
+  const filterMessages = (msgs) => {
+    const promptStart = 'با توجه به متن گفتگوی زیر، یک عنوان کوتاه و مناسب';
+    const systemNotePattern = /\[یادداشت سیستمی برای دلیار:.*?\]\n\nپیام کاربر:\s*/;
+    const filtered = [];
+    for (let i = 0; i < msgs.length; i++) {
+      const currentMsg = msgs[i];
+      const isNamingPrompt = currentMsg.type === 'NAMING_PROMPT' || (currentMsg.content && currentMsg.content.startsWith(promptStart));
+      if (isNamingPrompt) continue;
+      const isTitleResponse = currentMsg.type === 'AI' && i + 1 < msgs.length && (msgs[i + 1].type === 'NAMING_PROMPT' || (msgs[i + 1].content && msgs[i + 1].content.startsWith(promptStart)));
+      if (isTitleResponse) continue;
+      if (currentMsg.type === 'USER' && systemNotePattern.test(currentMsg.content)) {
+        const userContent = currentMsg.content.replace(systemNotePattern, '').trim();
+        filtered.push({ ...currentMsg, content: userContent });
+        continue;
+      }
+      filtered.push(currentMsg);
+    }
+    return filtered;
+  };
+
+  const handleInputChange = (e) => {
+    // Store input value exactly as entered
+    const inputValue = e.target.value;
+    setUserInput(inputValue);
+  };
+
+  const scrollToBottom = () => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTo({ top: chatBoxRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
+
+  const hasScrolledUp = () => {
+    if (!chatBoxRef.current) return false;
+    const { scrollTop, scrollHeight, clientHeight } = chatBoxRef.current;
+    return scrollHeight - scrollTop - clientHeight > 100;
+  };
+
+  // Update the sendMessage function with improved content handling
+const sendMessage = useCallback(async (contentOverride = null) => {
+  // Create a stable copy of the message content immediately
+  // Important: Store the exact text before any manipulation
+  const textToSend = contentOverride !== null ? String(contentOverride).trim() : String(userInput);
+  
+  console.log(`sendMessage called: text='${textToSend}', sessionId='${sessionId}', remainingTime=${remainingTime}`);
+
+  if (!textToSend || !sessionId) {
+      console.log('sendMessage aborted: Missing text or sessionId');
+      if (contentOverride && isWaitingForResponse) setIsWaitingForResponse(false);
+      return;
+  }
+
+  if (remainingTime <= 0 && !contentOverride) {
+      showStatusMessage("زمان شما تمام شده.", 4000, 'error');
+      console.log('sendMessage aborted: Time up for manual message');
+      return;
+  }
+
+  // Store exact content in a stable variable to ensure consistency
+  const exactUserMessage = textToSend;
+  
+  setIsWaitingForResponse(true);
+  
+  // Create user message with the exact content
+  const newUserMessage = { 
+      sender: 'user', 
+      content: exactUserMessage,  // Use the exact stored message
+      type: 'USER',
+      timestamp: new Date().toISOString() // Add timestamp for possible sorting
+  };
+  
+  // Update messages state with complete user message
+  setMessages(prevMessages => [...prevMessages, newUserMessage]);
+  
+  // Add loading indicator separately after user message is added
+  setMessages(prevMessages => [...prevMessages, { 
+      sender: 'bot', 
+      content: '', 
+      type: 'AI', 
+      isLoading: true,
+      timestamp: new Date().toISOString()
+  }]);
+  
+  // Clear input only after message is added to state
+  if (!contentOverride) setUserInput('');
+  userHasScrolledUpRef.current = false;
+
+  try {
+      const firstUserMessage = messages.filter(msg => msg.type === 'USER').length === 0;
+      
+      // Use the exact stored message in the API call
+      const response = await axios.post(`${API_URL}/respond`, {
+          sessionId,
+          content: exactUserMessage, // Use exact message
+          isFirstMessage: firstUserMessage,
+          messageType: 'USER'
+      });
+
+      // Update bot message with response content
+      setMessages(prevMessages => {
+          const updated = [...prevMessages];
+          const loadingIndex = updated.findIndex(msg => msg.isLoading);
+          
+          if (loadingIndex !== -1) {
+              // Replace loading message with response
+              updated[loadingIndex] = { 
+                  sender: 'bot', 
+                  content: response.data.content, 
+                  type: 'AI',
+                  timestamp: new Date().toISOString()
+              };
+          } else {
+              // Fallback if loading message not found
+              updated.push({ 
+                  sender: 'bot', 
+                  content: response.data.content, 
+                  type: 'AI',
+                  timestamp: new Date().toISOString()
+              });
+          }
+          return updated;
+      });
+
+  } catch (error) {
+      console.error('Error sending message:', error.response?.data || error.message);
+      const errorData = error.response?.data;
+      showStatusMessage(errorData?.error || 'خطا در ارسال پیام', 5000, 'error');
+      
+      // Remove loading message on error
+      setMessages(prevMessages => 
+          prevMessages.filter(msg => !msg.isLoading)
+      );
+
+      if (errorData?.session_ended) {
+          setRemainingTime(0);
+          if (intervalRef.current) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+          }
+      }
+  } finally {
+      setIsWaitingForResponse(false);
+  }
+}, [sessionId, showStatusMessage, API_URL, remainingTime, messages, userInput]);
+
+  // --- New Function: Check and Start Next Session ---
+  const handleStartNextSession = async () => {
+    setShowNextSessionPrompt(false);
+    try {
+      const response = await axios.post(`${API_URL}/api/chat/start-session`);
+      const data = response.data;
+      if (data.remaining_time > 0) {
+        setRemainingTime(data.remaining_time);
+        setAvailableMinutes(prev => prev - 20); // Assume 20-minute session
+        showStatusMessage('جلسه جدید شما آغاز شد.', 4000, 'success');
+
+        // Restart the timer
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        intervalRef.current = setInterval(() => {
+          setRemainingTime(prev => {
+            if (prev <= 1) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+              checkForNextSession();
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        showStatusMessage(data.error || 'خطا در شروع جلسه جدید', 5000, 'error');
+      }
+    } catch (error) {
+      console.error('Error starting next session:', error.response?.data || error.message);
+      showStatusMessage(error.response?.data?.error || 'خطا در شروع جلسه جدید', 5000, 'error');
+    }
+  };
+
+  // --- New Function: Check Available Sessions ---
+  const checkForNextSession = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/chat/check-access`);
+      const data = response.data;
+      setAvailableMinutes(data.available_minutes || 0);
+      if (data.remaining_time <= 0 && data.available_minutes >= 20) {
+        setShowNextSessionPrompt(true);
+      } else if (data.remaining_time <= 0) {
+        showStatusMessage('زمان چت شما به پایان رسیده و جلسه دیگری در دسترس نیست.', 6000, 'warning');
+      }
+    } catch (error) {
+      console.error('Error checking access:', error);
+      showStatusMessage('خطا در بررسی وضعیت جلسه', 5000, 'error');
+    }
+  }, [navigate, showStatusMessage]);
+
+  // --- Initialization and Timer Effect ---
   useEffect(() => {
-    const userData = localStorage.getItem('userData');
-    if (!userData) {
-      navigate('/');
+    console.log("--- ChatPage Initialization useEffect ---");
+    const currentSessionId = location.state?.sessionId;
+    const initialTimeFromLocation = isInitialMount.current ? location.state?.initialRemainingTime : undefined;
+
+    if (!currentSessionId) {
+      showStatusMessage("خطای جلسه...", 5000, 'error');
+      setTimeout(() => navigate('/start'), 2500);
       return;
     }
-  
-    const locationState = location.state;
-    
-    if (locationState?.sessionId) {
-      setSessionId(locationState.sessionId);
-      const fetchSessionData = async () => {
+    setSessionId(currentSessionId);
+
+    const fetchBalanceAndHistory = async () => {
+      try {
+        const balanceRes = await axios.get(`${API_URL}/api/wallet/balance`);
+        setWalletBalance(balanceRes.data.balance);
+        const accessRes = await axios.get(`${API_URL}/api/chat/check-access`);
+        setAvailableMinutes(accessRes.data.available_minutes || 0);
+      } catch (e) { console.error('Error fetching balance/access:', e); }
+      try {
+        const res = await axios.get(`${API_URL}/api/chat/sessions/${currentSessionId}`);
+        if (res.data?.messages?.length) {
+          setMessages(filterMessages(res.data.messages).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).map(msg => ({
+            sender: msg.type?.toLowerCase() === 'user' ? 'user' : 'bot',
+            content: msg.content || '',
+            type: msg.type || (msg.sender === 'user' ? 'USER' : 'AI')
+          })));
+        } else {
+          setMessages([]);
+        }
+      } catch (e) {
+        console.error('Error fetching history:', e);
+        showStatusMessage('خطا بارگذاری تاریخچه', 5000, 'error');
+      }
+    };
+
+    const checkAccessAndSetupTimer = async () => {
+      let timeToStart = 0;
+      if (isInitialMount.current && initialTimeFromLocation !== undefined && initialTimeFromLocation > 0) {
+        timeToStart = initialTimeFromLocation;
+        setRemainingTime(timeToStart);
+      } else {
         try {
-          const response = await axios.get(`${API_URL}/api/chat/sessions/${locationState.sessionId}`);
-          console.log("Session data response:", response.data);
-          
-          if (response.data) {
-            if (response.data.messages && Array.isArray(response.data.messages)) {
-              const formattedMessages = filterMessages(response.data.messages)
-                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-                .map(msg => ({
-                  sender: msg.type?.toLowerCase() === 'user' ? 'user' : 'bot',
-                  content: msg.content || '',
-                  originalContent: msg.content || '',
-                  type: msg.isNamingPrompt ? 'NAMING_PROMPT' : msg.type
-                }));
-              setMessages(formattedMessages);
-            } else {
-              console.log("No messages found in session data");
-              setMessages([]);
+          const response = await axios.get(`${API_URL}/api/chat/check-access`);
+          if (response.data.access && response.data.session_active) {
+            timeToStart = response.data.remaining_time;
+            setRemainingTime(timeToStart);
+            setAvailableMinutes(response.data.available_minutes || 0);
+          } else {
+            setRemainingTime(0);
+            setAvailableMinutes(response.data.available_minutes || 0);
+            if (!isInitialMount.current) {
+              showStatusMessage(response.data.message || "جلسه فعال نیست.", 8000, 'warning');
             }
           }
         } catch (error) {
-          console.error('Error fetching session data:', error);
-          setMessages([]);
+          console.error("Error checking access:", error);
+          setRemainingTime(0);
+          if (error.response?.status === 401) navigate('/');
+          else showStatusMessage("خطا در بررسی وضعیت جلسه.", 5000, 'error');
         }
-      };
-      fetchSessionData();
-    }
-  }, [navigate, location]);
+      }
+
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeToStart > 0) {
+        intervalRef.current = setInterval(() => {
+          setRemainingTime(prev => {
+            if (prev <= 1) {
+              clearInterval(intervalRef.current);
+              intervalRef.current = null;
+              checkForNextSession();
+              return 0;
+            }
+            console.log('Timer tick, remainingTime:', prev - 1);
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        checkForNextSession(); // Check immediately if no time
+      }
+    };
+
+    fetchBalanceAndHistory();
+    checkAccessAndSetupTimer();
+
+    isInitialMount.current = false;
+
+    return () => {
+      console.log("--- ChatPage Cleanup ---");
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+    };
+  }, [location.state?.sessionId, navigate, showStatusMessage, checkForNextSession]);
 
   useEffect(() => {
-    if (sttTriggered && userInput.trim() !== "" && !isWaitingForResponse) {
-      sendMessage();
-      setSttTriggered(false);
-    }
-  }, [userInput, sttTriggered, isWaitingForResponse]);
+    const handleScroll = () => { userHasScrolledUpRef.current = hasScrolledUp(); };
+    const chatBox = chatBoxRef.current;
+    if (chatBox) chatBox.addEventListener('scroll', handleScroll);
+    return () => { if (chatBox) chatBox.removeEventListener('scroll', handleScroll); };
+  }, []);
 
   useEffect(() => {
-    if (!isWaitingForResponse && inputRef.current) {
+    if (!chatBoxRef.current) return;
+    const lastMessage = messages[messages.length - 1];
+    const isUserMessage = lastMessage?.sender === 'user';
+    if (isUserMessage || !userHasScrolledUpRef.current) {
+      requestAnimationFrame(scrollToBottom);
+    }
+    if (!isWaitingForResponse && inputRef.current && remainingTime > 0 && !isRecording) {
       inputRef.current.focus();
     }
-  }, [isWaitingForResponse]);
+  }, [messages, isWaitingForResponse, remainingTime, isRecording]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('userData');
-    navigate('/');
-  };
-
-  const streamBotResponse = (botResponse) => {
-    let index = -1;
-    const streamInterval = setInterval(() => {
-      if (index < botResponse.length - 1) {
-        setMessages(prevMessages => [
-          ...prevMessages.slice(0, -1),
-          { sender: 'bot', content: prevMessages[prevMessages.length - 1].content + botResponse[index] }
-        ]);
-        index += 1;
-      } else {
-        clearInterval(streamInterval);
-        setIsWaitingForResponse(false);
-      }
-    }, 40);
-  };
-
-  const sendMessage = async () => {
-    if (!userInput.trim() || !sessionId || isWaitingForResponse) return;
+  const handleConfirmPurchase = async () => {
+    setMessage('');
+    setIsPurchaseModalOpen(false);
     setIsWaitingForResponse(true);
-
-    const isFirstMessage = messages.length === 0;
-    const newUserMessage = { 
-      sender: 'user', 
-      content: userInput.trim()
-    };
-    
-    const newMessages = [...messages, newUserMessage];
-    setMessages([...newMessages, { sender: 'bot', content: '' }]);
-    setUserInput('');
-
     try {
-      const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-      const messageToSend = {
-        sessionId,
-        content: userInput.trim(),
-        username: userData.username || null,
-        isFirstMessage
-      };
-
-      const response = await axios.post(`${API_URL}/respond`, messageToSend);
-      streamBotResponse(response.data.content);
+      const response = await axios.post(`${API_URL}/api/chat/purchase-session`);
+      showStatusMessage(response.data.message, 5000, 'success');
+      setWalletBalance(response.data.balance);
+      setAvailableMinutes(response.data.available_minutes || 0);
+      if (remainingTime <= 0) checkForNextSession(); // Check if we can prompt now
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Purchase error:', error);
+      showStatusMessage(error.response?.data?.error || 'خطا در خرید جلسه', 5000, 'error');
+    } finally {
       setIsWaitingForResponse(false);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !isWaitingForResponse) {
-      e.preventDefault();
-      sendMessage();
-    }
+  const handleTopUpRedirect = () => {
+    showStatusMessage("به صفحه شروع هدایت می‌شوید...", 3000);
+    navigate('/start', { state: { openPaymentModal: true } });
   };
 
-  const startRecording = async () => {
+  const sendAudioToBackend = useCallback(async (audioBlob) => {
     try {
-      console.log('Starting recording...');
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.wav');
+      const response = await axios.post(`${API_URL}/api/stt/transcribe`, formData, {
+        withCredentials: true,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000
+      });
+      const transcription = response.data.transcription;
+      if (transcription) {
+        showStatusMessage('متن دریافت شد، در حال ارسال...', 2000, 'success');
+        await sendMessage(transcription);
+      } else {
+        showStatusMessage('متن قابل تشخیصی دریافت نشد.', 4000, 'warning');
+        setIsWaitingForResponse(false);
+      }
+    } catch (error) {
+      console.error('Error in STT request:', error);
+      showStatusMessage(error.response?.data?.error || 'خطا در پردازش فایل صوتی', 5000, 'error');
+      setIsWaitingForResponse(false);
+    } finally {
+      audioChunksRef.current = [];
+    }
+  }, [API_URL, showStatusMessage, sendMessage]);
+
+  const startRecording = useCallback(async () => {
+    if (isWaitingForResponse || remainingTime <= 0) return;
+    try {
       setIsRecording(true);
       setShowRecordingText(true);
-
       audioChunksRef.current = [];
-      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      
+      const options = { mimeType: 'audio/webm' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) delete options.mimeType;
+      mediaRecorderRef.current = new MediaRecorder(stream, options);
       mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
       };
-
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        const base64Audio = await convertBlobToBase64(audioBlob);
-        sendAudioToSTT(base64Audio);
-        
-        stream.getTracks().forEach(track => track.stop());
+      mediaRecorderRef.current.onstop = () => {
+        stream.getTracks().forEach((track) => track.stop());
+        if (audioChunksRef.current.length === 0) {
+          showStatusMessage('هیچ صدایی ضبط نشد.', 3000, 'warning');
+          setIsWaitingForResponse(false);
+          return;
+        }
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current.mimeType || 'audio/wav' });
+        sendAudioToBackend(audioBlob);
       };
-      
       mediaRecorderRef.current.start();
     } catch (error) {
       console.error('Error starting recording:', error);
       setIsRecording(false);
       setShowRecordingText(false);
+      showStatusMessage('خطا در شروع ضبط صدا: ' + error.message, 5000, 'error');
+      setIsWaitingForResponse(false);
     }
-  };
+  }, [isWaitingForResponse, remainingTime, showStatusMessage, sendAudioToBackend]);
 
-  const stopRecording = () => {
+  const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
+      setIsWaitingForResponse(true);
+      mediaRecorderRef.current.stop();
       setIsRecording(false);
       setShowRecordingText(false);
-      mediaRecorderRef.current.stop();
+      showStatusMessage('در حال پردازش فایل صوتی...', 4000, 'info');
+    }
+  }, [isRecording, showStatusMessage]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !isWaitingForResponse && remainingTime > 0 && userInput.trim() && !isRecording) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
-  const convertBlobToBase64 = (blob) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = () => resolve(reader.result.split(",")[1]);
-      reader.onerror = (error) => reject(error);
-    });
-  };
-
-  const sendAudioToSTT = async (base64Audio) => {
-    try {
-      const blob = base64ToBlob(base64Audio, 'audio/wav');
-      
-      const formData = new FormData();
-      formData.append('file', blob, 'recording.wav');
-      formData.append('model', 'whisper-1');
-  
-      const REACT_APP_STT_API_KEY = process.env.REACT_APP_STT_API_KEY;
-  
-      const response = await axios.post(
-        'https://api.metisai.ir/openai/v1/audio/transcriptions', 
-        formData, 
-        {
-          headers: {
-            'Authorization': `Bearer ${REACT_APP_STT_API_KEY}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        }
-      );
-      
-      const resultText = response.data.text;
-      console.log("Transcription Result:", resultText);
-      
-      if (resultText) {
-        setUserInput(resultText);
-        setSttTriggered(true);
-      }
-    } catch (error) {
-      console.error("Error in STT API:", error);
+  const getMessageClass = (type) => {
+    switch (type) {
+      case 'error': return 'message-display error';
+      case 'success': return 'message-display success';
+      case 'warning': return 'message-display warning';
+      default: return 'message-display info';
     }
   };
-
-  const base64ToBlob = (base64, mime) => {
-    mime = mime || '';
-    const sliceSize = 1024;
-    const byteChars = window.atob(base64);
-    const byteArrays = [];
-  
-    for (let offset = 0, len = byteChars.length; offset < len; offset += sliceSize) {
-      const slice = byteChars.slice(offset, offset + sliceSize);
-      const byteNumbers = new Array(slice.length);
-      for (let i = 0; i < slice.length; i++) {
-        byteNumbers[i] = slice.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      byteArrays.push(byteArray);
-    }
-  
-    return new Blob(byteArrays, { type: mime });
-  };
-
-  const filterMessages = (messages) => {
-    const promptStart = "با توجه به متن گفتگوی زیر، یک عنوان کوتاه و مناسب";
-    const filteredMessages = [];
-    
-    const excludeIndices = new Set();
-    
-    for (let i = 0; i < messages.length; i++) {
-      if (messages[i].content && messages[i].content.startsWith(promptStart)) {
-        excludeIndices.add(i);     
-        if (i > 0) {
-          excludeIndices.add(i-1);  
-        }
-      }
-    }
-    
-    for (let i = 0; i < messages.length; i++) {
-      if (!excludeIndices.has(i)) {
-        filteredMessages.push(messages[i]);
-      }
-    }
-    
-    return filteredMessages;
-  };
-
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
 
   return (
     <div className="chat-page">
       <div className="chat-header">
-        <button onClick={handleLogout} className="logout-button" style={{
-          position: 'absolute', 
-          top: '1rem', 
-          left: '1rem', 
-          padding: '0.5rem 1rem',
-          backgroundColor: '#9ecedb', 
-          border: 'none', 
-          borderRadius: '20px', 
-          cursor: 'pointer', 
-          fontFamily: 'Vazirmatn'
-        }}>
-          خروج
-        </button>
+        <div className="wallet-info">
+          <span className="wallet-balance" title="موجودی کیف پول">موجودی: {walletBalance?.toLocaleString() || 0} تومان</span>
+          <button className="topup-button" onClick={handleTopUpRedirect} title="شارژ کیف پول">شارژ کیف پول</button>
+          <button className="purchase-session-button topup-button" onClick={() => setIsPurchaseModalOpen(true)} title="خرید جلسه">خرید جلسه</button>
+        </div>
       </div>
+      {message && (
+        <div id="status-message-display" className={getMessageClass(message.type)}>
+          {message.text}
+        </div>
+      )}
+      <div className="session-info">
+        <p>زمان باقی‌مانده: {Math.floor(remainingTime / 60)}:{(remainingTime % 60).toString().padStart(2, '0')}</p>
+        {availableMinutes > 0 && (
+          <p>دقایق موجود: {availableMinutes}</p>
+        )}
+      </div>
+      {isPurchaseModalOpen && (
+        <>
+          <div className="modal-overlay" onClick={() => { if (!isWaitingForResponse) setIsPurchaseModalOpen(false) }} />
+          <div className="modal purchase-modal payment-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>تأیید خرید جلسه</h3>
+            <p>آیا مایل به خرید یک جلسه ۲۰ دقیقه‌ای با کسر مبلغ <strong style={{ color: '#19386a' }}>{SESSION_PRICE.toLocaleString()} تومان</strong> از کیف پول هستید؟</p>
+            <p style={{ fontSize: '0.9em', color: '#555' }}>(موجودی فعلی: {walletBalance.toLocaleString()} تومان)</p>
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button onClick={() => { if (!isWaitingForResponse) setIsPurchaseModalOpen(false) }} className="cancel-button" disabled={isWaitingForResponse}>انصراف</button>
+              <button onClick={handleConfirmPurchase} className="confirm-button" disabled={walletBalance < SESSION_PRICE || isWaitingForResponse}>
+                {isWaitingForResponse ? '...' : (walletBalance < SESSION_PRICE ? 'موجودی کافی نیست' : 'بله، کسر کن')}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+      {showNextSessionPrompt && (
+        <>
+          <div className="modal-overlay" onClick={() => setShowNextSessionPrompt(false)} />
+          <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>شروع جلسه بعدی</h3>
+            <p>زمان جلسه فعلی شما به پایان رسیده است.</p>
+            <p>شما هنوز {availableMinutes} دقیقه گفتگوی خریداری‌شده دارید. آیا می‌خواهید هم‌اکنون جلسه بعدی را شروع کنید؟</p>
+            <div className="modal-actions">
+              <button onClick={() => { setShowNextSessionPrompt(false); navigate('/start'); }} className="cancel-button">خیر، بعداً</button>
+              <button onClick={handleStartNextSession} className="confirm-button">بله، الان شروع کن</button>
+            </div>
+          </div>
+        </>
+      )}
       <div className="chat-container">
         <div className="chat-box" ref={chatBoxRef}>
           {messages.map((msg, index) => (
-            <div key={index} className={`message-container ${msg.sender}-container`}>
-              <MessageBubble content={msg.content} sender={msg.sender} type={msg.type} />
-            </div>
+            <MessageBubble key={`${sessionId}-${index}`} content={msg.content} sender={msg.sender} type={msg.type} />
           ))}
-          <div ref={messagesEndRef} />
+          {isWaitingForResponse && messages[messages.length - 1]?.isLoading && (
+            <div className="message-container bot-container">
+              <div className="message-bubble bot typing-indicator">
+                <div className="dot"></div><div className="dot"></div><div className="dot"></div>
+              </div>
+            </div>
+          )}
         </div>
         <div className="input-section">
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <button 
+          <div className="record-button-wrapper">
+            <button
               onClick={isRecording ? stopRecording : startRecording}
-              className="record-button"
-              disabled={isWaitingForResponse}
-              style={{
-                color: '#19386a',
-                background: 'none',
-                border: 'none',
-                cursor: isWaitingForResponse ? 'not-allowed' : 'pointer',
-                padding: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                backgroundColor: isRecording ? '#1dbd72' : 'transparent',
-                transition: 'all 0.3s ease',
-                opacity: isWaitingForResponse ? 0.5 : 1
-              }}
+              className={`record-button ${isRecording ? 'recording' : ''}`}
+              disabled={isWaitingForResponse || remainingTime <= 0}
+              title={isRecording ? "پایان ضبط" : "ضبط صدا"}
             >
-              {isRecording ? (
-                <MicOff className="w-6 h-6 text-white" />
-              ) : (
-                <Mic className="w-6 h-6 text-gray-600 hover:text-gray-800" />
-              )}
+              {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
             </button>
-            {showRecordingText && (
-              <span style={{ 
-                color: '#1dbd72', 
-                fontSize: '12px', 
-                marginTop: '4px',
-                fontFamily: 'Vazirmatn'
-              }}>
-                در حال ضبط...
-              </span>
-            )}
+            {showRecordingText && <span className="recording-text">ضبط...</span>}
           </div>
           <input
             ref={inputRef}
-            style={{ 
-              fontFamily: 'Vazirmatn', 
-              textAlign: 'right', 
-              direction: 'rtl',
-              opacity: isWaitingForResponse ? 0.7 : 1
-            }}
             type="text"
             value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={isWaitingForResponse ? "لطفا منتظر پاسخ بمانید..." : "پیام به دلیار"}
-            disabled={isWaitingForResponse}
+            placeholder={
+              remainingTime <= 0 ? 'زمان شما تمام شده.' :
+              isWaitingForResponse ? 'لطفا منتظر پاسخ بمانید...' :
+              isRecording ? 'در حال ضبط صدا...' :
+              'پیام خود را بنویسید...'
+            }
+            disabled={isWaitingForResponse || remainingTime <= 0 || isRecording}
+            style={{ fontFamily: 'Vazirmatn', direction: 'rtl' }}
+            aria-label="متن پیام"
           />
-          <button 
-            onClick={sendMessage} 
-            style={{ 
-              fontFamily: 'Vazirmatn',
-              opacity: isWaitingForResponse ? 0.7 : 1,
-              cursor: isWaitingForResponse ? 'not-allowed' : 'pointer'
-            }}
-            disabled={isWaitingForResponse}
+          <button
+            onClick={() => sendMessage()}
+            className="send-button"
+            disabled={isWaitingForResponse || remainingTime <= 0 || !userInput.trim() || isRecording}
+            title="ارسال پیام"
           >
-            {isWaitingForResponse ? "ارسال" : "ارسال"}
+            <Send size={18} />
           </button>
         </div>
       </div>

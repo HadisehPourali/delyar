@@ -1,298 +1,310 @@
-import React, { useState, useEffect, forwardRef, useMemo } from 'react';
-import { Plus, X } from 'lucide-react';
+import React, { useState, useEffect, forwardRef, useMemo, useCallback } from 'react';
+import { Plus, X, RotateCw, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import './ChatSidebar.css';
 
-const API_URL = process.env.REACT_APP_API_URL;
-const TITLE_GENERATION_MARKER = 'title_generated_';
-const TITLE_GENERATION_QUEUE = 'title_generation_queue';
+// Constants for local storage keys
+const TITLE_GENERATION_MARKER = 'chatTitleGenerated_';
+const CHAT_TITLE_CACHE = 'chatTitleCache_';
+const TITLE_GENERATION_QUEUE = 'chatTitleQueue';
 
-const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar }, ref) => {
+const API_URL = process.env.REACT_APP_API_URL;
+
+const getUserPhone = () => {
+  try {
+    const userData = JSON.parse(localStorage.getItem('userData'));
+    return userData?.phone_number || null;
+  } catch {
+    return null;
+  }
+};
+
+const ChatSidebar = forwardRef(({ onSelectChat, onNewChat, isOpen, toggleSidebar, currentUserData }, ref) => {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [pendingTitleGeneration, setPendingTitleGeneration] = useState(() => {
-    // Initialize from localStorage to prevent losing queue on reload
+  const [titleQueue, setTitleQueue] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(TITLE_GENERATION_QUEUE) || '[]');
     } catch {
+      console.error("Failed to parse title queue from localStorage");
       return [];
     }
   });
+  const [processingTitle, setProcessingTitle] = useState(false);
 
-  // Save queue to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem(TITLE_GENERATION_QUEUE, JSON.stringify(pendingTitleGeneration));
-  }, [pendingTitleGeneration]);
+  const userPhoneNumber = useMemo(() => currentUserData?.phone_number || getUserPhone(), [currentUserData]);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchChats();
-    }
-  }, [isOpen, page]);
-
-  // Process title generation queue
-  useEffect(() => {
-    const generatePendingTitles = async () => {
-      if (pendingTitleGeneration.length === 0) return;
-      
-      // Process only one chat at a time
-      const chatToProcess = pendingTitleGeneration[0];
-      
-      try {
-        // Double-check that title hasn't been generated while in queue
-        const titleGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + chatToProcess.id);
-        if (titleGenerated) {
-          setPendingTitleGeneration(prev => prev.filter(item => item.id !== chatToProcess.id));
-          return;
-        }
-
-        const title = await generateTitleWithAI(chatToProcess.messages, chatToProcess.id);
-        
-        // Mark as generated before saving title to prevent race conditions
-        localStorage.setItem(TITLE_GENERATION_MARKER + chatToProcess.id, 'true');
-        localStorage.setItem(`chatTitle_${chatToProcess.id}`, title);
-        
-        setChats(prevChats => 
-          prevChats.map(chat => 
-            chat.id === chatToProcess.id ? { ...chat, title } : chat
-          )
-        );
-      } catch (error) {
-        console.error(`Error generating title for chat ${chatToProcess.id}:`, error);
-      } finally {
-        // Remove from queue regardless of success/failure
-        setPendingTitleGeneration(prev => prev.filter(item => item.id !== chatToProcess.id));
-      }
-    };
-    
-    generatePendingTitles();
-  }, [pendingTitleGeneration]);
-
-  const fetchChats = async () => {
     try {
-      setLoading(true);
-      setError(null);
+      localStorage.setItem(TITLE_GENERATION_QUEUE, JSON.stringify(titleQueue));
+    } catch (e) {
+      console.error("Failed to save title queue to localStorage:", e);
+    }
+  }, [titleQueue]);
 
-      const userData = JSON.parse(localStorage.getItem('userData'));
-      if (!userData?.username) {
-        console.log('No user data found');
-        return;
+  const fetchChatDetailsAndQueueTitle = useCallback(async (chatId) => {
+    const isGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + chatId) === 'true';
+    const isQueued = localStorage.getItem(TITLE_GENERATION_MARKER + chatId) === 'queued';
+
+    if (isGenerated || isQueued) {
+      if (isGenerated) {
+        const cachedTitle = localStorage.getItem(CHAT_TITLE_CACHE + chatId) || 'گفتگوی قبلی';
+        setChats(prev => prev.map(c => c.id === chatId && c.title !== cachedTitle ? { ...c, title: cachedTitle } : c));
+      }
+      return;
+    }
+
+    try {
+      const detailResponse = await axios.get(`${API_URL}/api/chat/sessions/${chatId}`);
+      const messages = detailResponse.data?.messages || detailResponse.data?.history || [];
+      const metisTitle = detailResponse.data?.title;
+
+      let lastMsgTime = chats.find(c => c.id === chatId)?.lastMessageTime || new Date().toISOString();
+      if (messages.length > 0) {
+        const sortedMessages = [...messages].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        lastMsgTime = sortedMessages[0].timestamp || lastMsgTime;
       }
 
+      let finalTitle = 'گفتگوی جدید';
+      let shouldQueue = false;
+
+      if (metisTitle && metisTitle.length > 1 && metisTitle !== 'گفتگوی جدید' && !metisTitle.includes('کاربر:')) {
+        finalTitle = metisTitle;
+        localStorage.setItem(CHAT_TITLE_CACHE + chatId, finalTitle);
+        localStorage.setItem(TITLE_GENERATION_MARKER + chatId, 'true');
+      } else if (messages.length > 0) {
+        finalTitle = 'در حال تولید عنوان...';
+        shouldQueue = true;
+      } else {
+        finalTitle = 'گفتگوی خالی';
+        localStorage.setItem(CHAT_TITLE_CACHE + chatId, finalTitle);
+        localStorage.setItem(TITLE_GENERATION_MARKER + chatId, 'true');
+      }
+
+      setChats(prevChats => prevChats.map(chat =>
+        chat.id === chatId ? { ...chat, title: finalTitle, messages: messages.slice(0, 5), lastMessageTime: lastMsgTime } : chat
+      ));
+
+      if (shouldQueue) {
+        const contextMessages = messages.slice(0, 5).map(m => ({ type: m.type, content: m.content?.substring(0, 150) }));
+        localStorage.setItem(TITLE_GENERATION_MARKER + chatId, 'queued'); // Mark as queued
+        setTitleQueue(prevQueue => {
+          if (!prevQueue.some(item => item.id === chatId)) {
+            return [...prevQueue, { id: chatId, messages: contextMessages }];
+          }
+          return prevQueue;
+        });
+      }
+    } catch (error) {
+      console.error(`Error fetching chat details for ${chatId}:`, error);
+      setChats(prevChats => prevChats.map(chat =>
+        chat.id === chatId ? { ...chat, title: 'خطا در بارگذاری عنوان' } : chat
+      ));
+    }
+  }, [chats]);
+
+  const fetchChats = useCallback(async (reset = false) => {
+    if (loading || (!hasMore && !reset)) return;
+    if (!userPhoneNumber) {
+      setError("لطفا ابتدا وارد شوید.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    const targetPage = reset ? 0 : page;
+
+    try {
       const response = await axios.get(`${API_URL}/api/chat/sessions`, {
-        params: {
-          userId: userData.username,
-          page: page,
-          size: 10
-        }
+        params: { page: targetPage, size: 15 }
       });
 
-      const fetchedChats = response.data.map(chat => ({
-        ...chat,
-        title: localStorage.getItem(`chatTitle_${chat.id}`) || 'گفتگوی جدید',
-        lastMessageTime: chat.startDate
-      }));
+      const fetchedChats = response.data.map(chat => {
+        const cachedTitle = localStorage.getItem(CHAT_TITLE_CACHE + chat.id);
+        const isGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + chat.id) === 'true';
+        const isQueued = localStorage.getItem(TITLE_GENERATION_MARKER + chat.id) === 'queued';
+        return {
+          ...chat,
+          id: chat.id,
+          title: (isGenerated && cachedTitle) ? cachedTitle : (isQueued ? 'در حال تولید عنوان...' : 'در حال بارگذاری عنوان...'),
+          lastMessageTime: chat.lastActivityDate || chat.startDate || new Date().toISOString(),
+          needsTitleCheck: !(isGenerated || isQueued),
+        };
+      });
 
-      setHasMore(fetchedChats.length === 10);
+      setHasMore(fetchedChats.length === 15);
       setChats(prevChats => {
-        if (page === 0) {
-          return fetchedChats;
-        } else {
-          return [...prevChats, ...fetchedChats];
+        const existingIds = new Set(prevChats.map(c => c.id));
+        const uniqueNewChats = fetchedChats.filter(c => !existingIds.has(c.id));
+        return reset ? fetchedChats : [...prevChats, ...uniqueNewChats];
+      });
+      setPage(prevPage => reset ? 1 : prevPage + 1);
+
+      fetchedChats.forEach(chat => {
+        if (chat.needsTitleCheck) {
+          fetchChatDetailsAndQueueTitle(chat.id);
         }
       });
-
-      // Fetch detailed information in the background
-      fetchedChats.forEach(chat => fetchChatDetails(chat.id));
     } catch (err) {
-      console.error('Error fetching chats:', err);
+      console.error('Error fetching chats:', err.response?.data || err.message);
       setError('خطا در بارگذاری تاریخچه گفتگو');
+      if (err.response?.status === 401) setError("نشست نامعتبر. لطفا دوباره وارد شوید.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [userPhoneNumber, fetchChatDetailsAndQueueTitle]);
 
-  const fetchChatDetails = async (chatId) => {
-    try {
-      // Check if title generation is already completed or in progress
-      const titleGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + chatId);
-      const inQueue = pendingTitleGeneration.some(item => item.id === chatId);
-      
-      const detailResponse = await axios.get(`${API_URL}/api/chat/sessions/${chatId}`);
-      const messages = detailResponse.data.messages || [];
-
-      // Find the timestamp of the last message
-      let lastMessageTime = null;
-      if (messages.length > 0) {
-        const sortedMessages = [...messages].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        lastMessageTime = sortedMessages[0].timestamp || null;
-      }
-
-      let title = localStorage.getItem(`chatTitle_${chatId}`) || 'گفتگوی جدید';
-      
-      // Only queue title generation if:
-      // 1. We haven't generated a title before
-      // 2. It's not already in the queue
-      // 3. There are messages to generate from
-      // 4. We don't already have a custom title
-      if (!titleGenerated && !inQueue && messages.length > 0 && title === 'گفتگوی جدید') {
-        // Limit to first 5 messages for title generation
-        const limitedMessages = messages.slice(0, 5);
-        
-        // Add to pending generation queue
-        setPendingTitleGeneration(prev => [...prev, { id: chatId, messages: limitedMessages }]);
-      }
-
-      setChats(prevChats => prevChats.map(chat => 
-        chat.id === chatId ? { ...chat, messages, title, lastMessageTime } : chat
-      ));
-    } catch (error) {
-      console.error(`Error fetching chat details for ${chatId}:`, error);
+  useEffect(() => {
+    if (isOpen && chats.length === 0) {
+      console.log("Sidebar opened and chats empty, triggering initial fetch.");
+      setPage(0);
+      setHasMore(true);
+      fetchChats(true);
     }
-  };
-  
-  const generateTitleWithAI = async (messages, sessionId) => {
-    try {
-      // Final check before sending request
-      const titleGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + sessionId);
-      if (titleGenerated) {
-        return localStorage.getItem(`chatTitle_${sessionId}`) || 'گفتگوی جدید';
+  }, [isOpen, fetchChats]);
+
+  useEffect(() => {
+    const generatePendingTitle = async () => {
+      if (titleQueue.length === 0 || processingTitle) return;
+
+      setProcessingTitle(true);
+      const chatToProcess = titleQueue[0];
+
+      try {
+        const isGenerated = localStorage.getItem(TITLE_GENERATION_MARKER + chatToProcess.id) === 'true';
+        if (isGenerated) {
+          const cachedTitle = localStorage.getItem(CHAT_TITLE_CACHE + chatToProcess.id) || 'گفتگوی قبلی';
+          setChats(prev => prev.map(c => c.id === chatToProcess.id ? { ...c, title: cachedTitle } : c));
+          setTitleQueue(prev => prev.slice(1));
+          setProcessingTitle(false);
+          return;
+        }
+        const titlePrompt = `با توجه به متن گفتگوی زیر، یک عنوان کوتاه و مناسب (حداکثر ۵ کلمه) پیشنهاد بده. فقط خود عنوان را بنویس:\n\n`;
+
+        const response = await axios.post(`${API_URL}/respond`, {
+          sessionId: chatToProcess.id,
+          content: titlePrompt,
+          isFirstMessage: false,
+          messageType: 'AI' // Custom flag for backend to recognize
+        }, { timeout: 30000 });
+
+        let generatedTitle = response.data?.content?.trim() || 'گفتگوی جدید';
+        generatedTitle = generatedTitle.replace(/^عنوان:\s*/i, '').replace(/["'*]/g, '');
+        if (generatedTitle.length > 40) generatedTitle = generatedTitle.substring(0, 37) + '...';
+        if (!generatedTitle || generatedTitle.toLowerCase().includes('کاربر:') || generatedTitle.length < 3) {
+          const chatDate = chats.find(c => c.id === chatToProcess.id)?.lastMessageTime || Date.now();
+          generatedTitle = `گفتگو (${new Date(chatDate).toLocaleDateString('fa-IR')})`;
+        }
+
+        localStorage.setItem(CHAT_TITLE_CACHE + chatToProcess.id, generatedTitle);
+        localStorage.setItem(TITLE_GENERATION_MARKER + chatToProcess.id, 'true');
+
+        setChats(prevChats => prevChats.map(chat =>
+          chat.id === chatToProcess.id ? { ...chat, title: generatedTitle } : chat
+        ));
+      } catch (error) {
+        console.error(`Error generating title for chat ${chatToProcess.id}:`, error.response?.data || error.message);
+        const fallbackTitle = 'خطا در تولید عنوان';
+        localStorage.setItem(CHAT_TITLE_CACHE + chatToProcess.id, fallbackTitle);
+        localStorage.setItem(TITLE_GENERATION_MARKER + chatToProcess.id, 'true');
+        setChats(prevChats => prevChats.map(chat =>
+          chat.id === chatToProcess.id ? { ...chat, title: fallbackTitle } : chat
+        ));
+      } finally {
+        setTitleQueue(prev => prev.slice(1));
+        setProcessingTitle(false);
       }
-  
-      const titlePrompt = {
-        message: {
-          content: `با توجه به متن گفتگوی زیر، یک عنوان کوتاه و مناسب (حداکثر 5 کلمه) برای این مکالمه پیشنهاد کن. فقط عنوان را بنویس، بدون هیچ توضیح اضافه:\n\n`,
-          type: "USER"
-        }
-      };
-  
-      const response = await axios.post(
-        `${API_URL}/respond`,
-        {
-          sessionId: sessionId,
-          content: titlePrompt.message.content,
-          isFirstMessage: false
-        }
-      );
-  
-      return response.data.content.trim();
-    } catch (error) {
-      console.error('Error generating title:', error);
-      return 'گفتگوی جدید';
-    }
-  };
+    };
+
+    const timeoutId = setTimeout(generatePendingTitle, 500);
+    return () => clearTimeout(timeoutId);
+  }, [titleQueue, processingTitle, chats]);
 
   const formatDate = (dateString) => {
+    if (!dateString) return 'زمان نامشخص';
     try {
       const date = new Date(dateString);
-
-      // Create Persian date formatter for date part
-      const dateFormatter = new Intl.DateTimeFormat('fa-IR', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      });
-
-      // Create separate time formatter
-      const timeFormatter = new Intl.DateTimeFormat('fa-IR', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
-      // Format date and time separately
-      const formattedDate = dateFormatter.format(date);
-      const formattedTime = timeFormatter.format(date);
-
-      // Return in the format: day month ساعت time
-      const dateParts = formattedDate.split(' ');
-      if (dateParts.length >= 2) {
-        // Make sure the day is before the month (fix the ordering issue)
-        return `روز ${dateParts[0]} ${dateParts[1]} ساعت ${formattedTime} `;
-      }
-
-      // Fallback if the splitting doesn't work as expected
-      return `${formattedDate} ساعت ${formattedTime}`;
+      return new Intl.DateTimeFormat('fa-IR', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).format(date);
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return dateString;
+      return String(dateString).split('T')[0] || 'تاریخ نامعتبر';
     }
   };
 
-  const handleSelectChat = async (chatData) => {
-    try {
-      const response = await axios.get(`${API_URL}/api/chat/sessions/${chatData.id}`);
-      const messages = response.data.messages || [];
-      onSelectChat({ ...chatData, messages });
-      if (toggleSidebar) {
-        toggleSidebar();
-      }
-    } catch (error) {
-      console.error('Error fetching chat session:', error);
-      setError('خطا در بارگذاری گفتگو');
-    }
+  const handleSelectChat = (chatData) => {
+    onSelectChat({ id: chatData.id });
+    if (toggleSidebar) toggleSidebar();
   };
 
   const handleNewChatClick = () => {
     onNewChat();
-    if (toggleSidebar) {
-      toggleSidebar();
-    }
+    if (toggleSidebar) toggleSidebar();
   };
 
   const sortedChats = useMemo(() => {
-    return chats.sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
+    return [...chats].sort((a, b) => new Date(b.lastMessageTime) - new Date(a.lastMessageTime));
   }, [chats]);
 
   return (
-    <div ref={ref} className={`sidebar ${isOpen ? 'open' : ''}`}>
-      <div className={`sidebar ${isOpen ? 'open' : ''}`}>
-        <div className="sidebar-header">
-          <button onClick={handleNewChatClick} className="new-chat-button">
-            <Plus size={20} />
-            <span>گفتگوی جدید</span>
+    <div ref={ref} className={`sidebar ${isOpen ? 'open' : ''}`} aria-hidden={!isOpen}>
+      <div className="sidebar-header">
+        <button onClick={handleNewChatClick} className="new-chat-button" title="شروع یک گفتگوی جدید با دلیار">
+          <Plus size={20} />
+          <span>گفتگوی جدید</span>
+        </button>
+        <button onClick={toggleSidebar} className="close-button" title="بستن منو" aria-label="بستن منو">
+          <X size={24} />
+        </button>
+      </div>
+      <div className="chat-list">
+        <button
+          onClick={() => { setChats([]); setPage(0); setHasMore(true); fetchChats(true); }}
+          disabled={loading}
+          className="refresh-button"
+          title="بارگذاری مجدد تاریخچه"
+        >
+          <RotateCw size={16} style={{ marginLeft: '5px' }} className={loading ? 'spinning' : ''}/>
+          {loading && page === 0 ? 'در حال بارگذاری...' : 'بارگذاری مجدد'}
+        </button>
+        {error && (
+          <div className="error-message">
+            <AlertCircle size={18} style={{ marginRight: '8px', color: '#c53030' }}/>
+            {error}
+          </div>
+        )}
+        {sortedChats.map((chat) => (
+          <button
+            key={chat.id}
+            onClick={() => handleSelectChat(chat)}
+            className="chat-item"
+            title={`ادامه گفتگو: ${chat.title}`}
+          >
+            <span className="chat-title">
+              {chat.title && chat.title.includes('...') && !chat.title.includes('خطا') && <span className="loading-indicator" title="در حال تولید عنوان..."></span>}
+              {chat.title || `گفتگو (${formatDate(chat.lastMessageTime)})`}
+            </span>
+            <span className="chat-date">
+              {formatDate(chat.lastMessageTime)}
+            </span>
           </button>
-          <button onClick={toggleSidebar} className="close-button">
-            <X size={20} />
+        ))}
+        {loading && chats.length === 0 && (
+          <div className="loading-message">در حال بارگذاری تاریخچه...</div>
+        )}
+        {hasMore && !loading && sortedChats.length > 0 && (
+          <button onClick={() => fetchChats()} className="load-more-button" disabled={loading}>
+            {loading ? '...' : 'نمایش بیشتر'}
           </button>
-        </div>
-
-        <div className="chat-list">
-          {error && (
-            <div className="error-message" style={{ padding: '1rem', color: 'red', textAlign: 'center' }}>
-              {error}
-            </div>
-          )}
-
-          {sortedChats.map((chat) => (
-            <button
-              key={chat.id}
-              onClick={() => handleSelectChat(chat)}
-              className="chat-item"
-            >
-              <span className="chat-title">
-                {chat.title}
-              </span>
-              <span className="chat-date">
-                {formatDate(chat.lastMessageTime)}
-              </span>
-            </button>
-          ))}
-
-          {loading && (
-            <div style={{ textAlign: 'center', padding: '1rem', color: '#666' }}>
-              در حال بارگذاری...
-            </div>
-          )}
-
-          {hasMore && !loading && (
-            <button onClick={() => setPage(prev => prev + 1)} className="load-more-button">
-              نمایش بیشتر
-            </button>
-          )}
-        </div>
+        )}
+        {!loading && sortedChats.length === 0 && !error && (
+          <div className="no-chats-message">تاریخچه گفتگویی یافت نشد.</div>
+        )}
       </div>
     </div>
   );
