@@ -6,7 +6,7 @@ import PaymentModal from './PaymentModal'; // <-- ADD THIS LINE
 import './PaymentModal.css'; // Styles for payment/confirm modals reusing PaymentModal.css structure
 import EmergencyContact from './EmergencyContact';
 import ChatSidebar from './ChatSidebar';
-import { Menu, LogOut, Send, MessageSquare, Star, User, LogIn } from 'lucide-react';
+import { Menu, LogOut, Send, MessageSquare, Star, User, LogIn, ClipboardList } from 'lucide-react';
 import axios from 'axios';
 
 // Ensure Axios is configured for credentials
@@ -801,15 +801,25 @@ const StartPage = () => {
            {isLoggedIn && ( <div className="feedback-section"> <button className="feedback-toggle-button" onClick={() => setShowFeedbackForm(true)} title="نظر خود را در مورد دلیار ثبت کنید"> <MessageSquare size={18} style={{marginRight: '8px' }}/> ثبت نظر </button> </div> )}
             
            <div className="footer-info">
+           <div className="survey-link-section">
+              <a 
+                href="https://survey.porsline.ir/s/u8eZtZ2T" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="survey-link-button"
+                title="با پاسخ به چند سوال ساده، در ساخت نسخه‌ای بهتر از دلیار سهیم باشید"
+              >
+                <ClipboardList size={18} style={{ marginRight: '8px' }}/> 
+                در ساخت دلیار، با ما همراه شوید
+              </a>
+              <p className="survey-link-description">
+                با چند دقیقه زمان و پاسخ به پرسشنامه، به ما کمک می‌کنید تا دلیار را بهتر، دقیق‌تر و متناسب‌تر با نیازهای شما بسازیم. 
+                نظرات شما برای ما باارزش است 🌱
+              </p>
+            </div>
             <p className="support-email">
               پشتیبانی: <a href="mailto:h.pourali.a@gmail.com">h.pourali.a@gmail.com</a>
             </p>
-            <div className="enamad-logo">
-              {/* Enamad Trust Seal */}
-              <a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=590293&Code=lWdTtoT7pK6pXiPEsDfSGGwlOkvkt2kg'>
-                <img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=590293&Code=lWdTtoT7pK6pXiPEsDfSGGwlOkvkt2kg' alt='Enamad Trust Seal' style={{ cursor: 'pointer' }} code='lWdTtoT7pK6pXiPEsDfSGGwlOkvkt2kg' />
-              </a>
-            </div>
           </div>
           {/* Logout Button */}
           {isLoggedIn && ( <button className="logout-button" onClick={handleLogout} title="خروج از حساب کاربری" > <LogOut size={16} /> خروج </button> )}
@@ -846,20 +856,31 @@ const StartPage = () => {
     
            {/* --- Direct Purchase Confirmation Modal (Uses base styles) --- */}
            {isPurchaseModalOpen && (
-                <>
-                  <div className="modal-overlay" onClick={() => {if (!isAuthLoading) setIsPurchaseModalOpen(false)}} />
-                  <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
-                    <div className="modal-content">
-                        <h3>تأیید خرید جلسه</h3>
-                        <p> آیا مایل به خرید یک جلسه ۲۰ دقیقه‌ای با کسر مبلغ <strong style={{color: '#19386a'}}>{SESSION_PRICE.toLocaleString()} تومان</strong> از کیف پول خود هستید؟ </p>
-                        <p style={{fontSize: '0.9em', color: '#555'}}> (موجودی فعلی: {walletBalance.toLocaleString()} تومان) </p>
-                    </div>
-                    <div className="modal-actions">
-                        <button onClick={() => {if (!isAuthLoading) setIsPurchaseModalOpen(false)}} className="cancel-button" disabled={isAuthLoading} > انصراف </button>
-                        <button onClick={handleConfirmDirectPurchase} className="confirm-button" disabled={walletBalance < SESSION_PRICE || isAuthLoading} > {isAuthLoading ? '...' : (walletBalance < SESSION_PRICE ? 'موجودی کافی نیست' : 'بله، کسر کن')} </button>
-                    </div>
+              <div className="modal-overlay" onClick={() => {if (!isAuthLoading) setIsPurchaseModalOpen(false)}}>
+                <div className="modal confirm-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-content">
+                    <h3>تأیید خرید جلسه</h3>
+                    <p>آیا مایل به خرید یک جلسه ۲۰ دقیقه‌ای با کسر مبلغ <strong style={{color: '#19386a'}}>{SESSION_PRICE.toLocaleString()} تومان</strong> از کیف پول خود هستید؟</p>
+                    <p style={{fontSize: '0.9em', color: '#555'}}>(موجودی فعلی: {walletBalance.toLocaleString()} تومان)</p>
                   </div>
-                </>
+                  <div className="modal-actions">
+                    <button 
+                      onClick={() => {if (!isAuthLoading) setIsPurchaseModalOpen(false)}} 
+                      className="cancel-button" 
+                      disabled={isAuthLoading}
+                    >
+                      انصراف
+                    </button>
+                    <button 
+                      onClick={handleConfirmDirectPurchase} 
+                      className="confirm-button" 
+                      disabled={walletBalance < SESSION_PRICE || isAuthLoading}
+                    >
+                      {isAuthLoading ? '...' : (walletBalance < SESSION_PRICE ? 'موجودی کافی نیست' : 'بله، کسر کن')}
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
     
           {/* --- Start Session Confirmation Modal (Uses base styles) --- */}

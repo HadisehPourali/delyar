@@ -304,28 +304,40 @@ body {
 /* Generic Modal Styles */
 .modal-overlay {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  z-index: 1040;
-  display: flex; /* Use flex to center the modal */
-  align-items: center; /* Vertically center */
-  justify-content: center; /* Horizontally center */
-  padding: 20px; /* Add padding to prevent modal touching edges */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: var(--overlay-z-index);
+  padding: 15px;
+  backdrop-filter: blur(3px);
+  animation: fadeInOverlay 0.3s ease;
 }
 
 .modal {
-  background-color: #fff;
-  padding: 25px 30px;
+  position: fixed; /* Add this */
+  top: 50%; /* Add this */
+  left: 50%; /* Add this */
+  transform: translate(-50%, -50%); /* Add this */
+  background-color: var(--text-light);
   border-radius: 12px;
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
-  z-index: 1050;
-  width: clamp(320px, 90vw, 450px); /* Responsive width */
-  height: auto; /* Allow natural height */
-  max-height: none; /* Explicitly remove max-height */
-  overflow: visible !important; /* Force content visibility, override others */
-  text-align: center;
-  font-family: var(--font-family);
+  max-width: 90%;
+  width: 420px;
+  text-align: right;
   direction: rtl;
+  font-family: var(--font-family);
+  color: var(--text-dark);
+  animation: fadeInModal 0.3s ease-out;
+  z-index: calc(var(--modal-z-index) + 1);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
 }
 
 .modal h3 {
@@ -464,4 +476,8 @@ body {
   .modal .modal-actions { margin-top: 20px; gap: 10px; }
   .modal button { padding: 8px 18px; font-size: 0.85rem; }
 }
-/* --- END OF COMPLETE ChatPage.css - Comprehensive Fix Attempt --- */
+
+@keyframes fadeInModal { 
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); } 
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); } 
+}

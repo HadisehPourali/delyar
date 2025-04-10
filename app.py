@@ -218,7 +218,7 @@ def request_otp():
                  logger.error(f"Melipayamak sent success but no code provided for {phone_number}")
                  return jsonify({'error': 'خطا در پردازش کد یکبار مصرف'}), 500
 
-            expiry_time = datetime.utcnow() + timedelta(minutes=5)
+            expiry_time = datetime.utcnow() + timedelta(minutes=20)
             # Store OTP and expiry in the user's session
             session['otp_data'] = {'otp': str(otp_code), 'expiry': expiry_time.isoformat(), 'phone': phone_number}
             logger.info(f"OTP sent to {phone_number}, expires at {expiry_time}")
@@ -442,7 +442,7 @@ def check_chat_access():
     elif is_eligible_for_free:
         response_data.update({
             'access': True,
-            'message': 'شما می‌توانید از ۵ دقیقه چت رایگان استفاده کنید.',
+            'message': 'شما می‌توانید از ۲۰ دقیقه چت رایگان استفاده کنید.',
             'needs_start': True,
             'is_free_chat_available': True,
         })
@@ -454,7 +454,7 @@ def check_chat_access():
 
     return jsonify(response_data)
 
-# This endpoint might be called by the frontend timer when the free 5 mins expire
+# This endpoint might be called by the frontend timer when the free 20 mins expire
 @app.route('/api/chat/end-free-session', methods=['POST'])
 def end_free_session():
     user = get_current_user()
@@ -633,7 +633,7 @@ def start_session():
 
     now = datetime.utcnow()
     session_duration_minutes = 20
-    free_session_duration_minutes = 5
+    free_session_duration_minutes = 20
     activation_buffer_seconds = 20
 
     try:

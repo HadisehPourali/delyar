@@ -261,33 +261,41 @@
    ========================================================================== */
 
    .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0, 0, 0, 0.7); /* Darker */
-    display: flex; justify-content: center; align-items: center;
-    z-index: 1100; /* Ensure consistent z-index */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: var(--overlay-z-index);
     padding: 15px;
     backdrop-filter: blur(3px);
     animation: fadeInOverlay 0.3s ease;
   }
   
   .modal {
+    position: fixed; /* Add this */
+    top: 50%; /* Add this */
+    left: 50%; /* Add this */
+    transform: translate(-50%, -50%); /* Add this */
     background-color: var(--text-light);
-    padding: 0; /* Remove base padding, handle with content/actions */
     border-radius: 12px;
     box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
     max-width: 90%;
-    width: 420px; /* Default width, specific modals can override */
-    text-align: right; direction: rtl;
+    width: 420px;
+    text-align: right;
+    direction: rtl;
     font-family: var(--font-family);
     color: var(--text-dark);
-    /* --- REMOVE position: relative; --- */
-    /* position: relative; */
     animation: fadeInModal 0.3s ease-out;
-    z-index: 1101; /* Ensure modals are above overlay */
+    z-index: calc(var(--modal-z-index) + 1);
     display: flex;
     flex-direction: column;
-    max-height: 90vh; /* Limit height */
-    overflow: hidden; /* Hide overflow on main modal container */
+    max-height: 90vh;
+    overflow: hidden;
   }
   
   /* --- Modal Content Area (Scrollable) --- */
@@ -389,6 +397,51 @@
     opacity: 1;
   }
 
+  .survey-link-section {
+    margin-top: 35px; /* Space above the section */
+    width: 100%;
+    max-width: 400px; /* Adjust width as needed */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.08); /* Subtle background */
+    border: 1px solid rgba(158, 206, 219, 0.3); /* Light border */
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  .survey-link-button {
+    font-family: var(--font-family);
+    padding: 10px 22px; /* Slightly larger padding */
+    background-color: var(--accent-color-light); /* Use accent color */
+    color: var(--secondary-color); /* Dark text for contrast */
+    border: none;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: 500; /* Make it slightly bold */
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none; /* Remove underline from link */
+    margin-bottom: 10px; /* Space below button */
+  }
+  
+  .survey-link-button:hover {
+    background-color: var(--accent-color-medium); /* Darken on hover */
+    transform: translateY(-1px);
+  }
+  
+  .survey-link-description {
+    font-size: 14px;
+    color: var(--accent-color-light); /* Lighter text */
+    line-height: 1.6;
+    margin: 0;
+  }
+
 /* --- Specific Modal Type Styles --- */
 .auth-modal { max-width: 400px; }
 .auth-modal .edit-phone-button { width: 100%; margin-top: 10px; font-size: 14px; color:#555; background: none; border: none; cursor: pointer; text-align: center; padding: 5px; }
@@ -426,7 +479,10 @@
 
 /* --- Animations --- */
 @keyframes fadeInOverlay { from { opacity: 0; } to { opacity: 1; } }
-@keyframes fadeInModal { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+@keyframes fadeInModal { 
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); } 
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); } 
+}
 
 /* --- Media Queries --- */
 @media (max-width: 768px) {
@@ -446,7 +502,10 @@
   .wallet-balance { order: 3; width: 100%; text-align: center; margin-top: 5px; }
   .header .topup-button, .header .purchase-session-button,
   .header .profile-button, .header .auth-button-header { padding: 6px 10px; font-size: 12px; }
-  .modal { width: 95%; padding: 20px 15px; }
+  .modal {
+    width: 95%;
+    max-height: 80vh;
+  }
   .modal h3 { font-size: 1.1em; }
   .modal p { font-size: 14px; }
   .modal button { font-size: 14px; padding: 9px 15px; max-width: 100%; }
@@ -463,4 +522,15 @@
    .enamad-logo img {
       max-width: 80px; /* Slightly smaller logo on mobile */
    }
+   .survey-link-section {
+    margin-top: 25px;
+    padding: 12px;
+  }
+  .survey-link-button {
+    padding: 9px 18px;
+    font-size: 14px;
+  }
+  .survey-link-description {
+    font-size: 13px;
+  }
 }
