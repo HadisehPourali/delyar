@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import relationship
 from flask_session import Session # For server-side sessions
 from sqlalchemy.exc import IntegrityError
+from melipayamak import Api
+import random
+import string
 
 load_dotenv()
 
@@ -67,9 +70,9 @@ CHATBOT_HEADERS = {
 }
 
 # Melipayamak Configuration
-MELIPAYAMAK_API_KEY = os.getenv('MELIPAYAMAK_API_KEY')
-MELIPAYAMAK_OTP_URL_BASE = os.getenv('MELIPAYAMAK_OTP_URL', 'https://console.melipayamak.com/api/send/otp/')
-MELIPAYAMAK_OTP_URL = MELIPAYAMAK_OTP_URL_BASE + MELIPAYAMAK_API_KEY if MELIPAYAMAK_API_KEY else None
+MELIPAYAMAK_USERNAME = os.getenv('MELIPAYAMAK_USERNAME')
+MELIPAYAMAK_PASSWORD = os.getenv('MELIPAYAMAK_PASSWORD')
+MELIPAYAMAK_TEMPLATE = os.getenv('MELIPAYAMAK_TEMPLATE')
 
 # Zarinpal Configuration
 ZARINPAL_MERCHANT_ID = os.getenv('MMERCHANT_ID') 
@@ -192,48 +195,31 @@ def validate_phone_number(phone):
 
 @app.route('/api/auth/request-otp', methods=['POST'])
 def request_otp():
-    if not MELIPAYAMAK_OTP_URL:
-        logger.error("Melipayamak API Key/URL not configured.")
-        return jsonify({'error': 'سرویس پیامک در دسترس نیست'}), 503
-
     data = request.json
     phone_number = data.get('phone_number')
-    print(phone_number)
     if not validate_phone_number(phone_number):
         return jsonify({'error': 'شماره تلفن وارد شده معتبر نیست'}), 400
 
-    # Optional: Add rate limiting here to prevent abuse
-
-    payload = {'to': phone_number}
     try:
-        response = requests.post(MELIPAYAMAK_OTP_URL, json=payload, timeout=15)
-        response.raise_for_status()
-        result = response.json()
-        logger.debug(f"Melipayamak response for {phone_number}: {result}")
-
-        if result.get('status') == "ارسال موفق بود" or True:
-            otp_code = 4041
-            #otp_code = result.get('code')
-            if not otp_code:
-                 logger.error(f"Melipayamak sent success but no code provided for {phone_number}")
-                 return jsonify({'error': 'خطا در پردازش کد یکبار مصرف'}), 500
-
+        otp_code = ''.join(random.choices(string.digits, k=4))
+        print
+        melipayamak_api = Api(MELIPAYAMAK_USERNAME, MELIPAYAMAK_PASSWORD)
+        sms_rest = melipayamak_api.sms()
+        
+        response = sms_rest.send_by_base_number(otp_code, phone_number, MELIPAYAMAK_TEMPLATE)
+        
+        logger.debug(f"Melipayamak response for {phone_number}: {response}")
+        
+        
+        if response['StrRetStatus'] == 'Ok':  
             expiry_time = datetime.utcnow() + timedelta(minutes=20)
-            # Store OTP and expiry in the user's session
-            session['otp_data'] = {'otp': str(otp_code), 'expiry': expiry_time.isoformat(), 'phone': phone_number}
+            session['otp_data'] = {'otp': otp_code, 'expiry': expiry_time.isoformat(), 'phone': phone_number}
             logger.info(f"OTP sent to {phone_number}, expires at {expiry_time}")
             return jsonify({'message': 'کد یکبار مصرف ارسال شد'}), 200
         else:
-            logger.error(f"Melipayamak failed to send OTP to {phone_number}: {result.get('status')}")
-            # Provide a more generic error to the user
+            logger.error(f"Melipayamak failed to send OTP to {phone_number}: {response}")
             return jsonify({'error': 'امکان ارسال کد یکبار مصرف وجود ندارد. لطفا دقایقی دیگر تلاش کنید.'}), 500
 
-    except requests.exceptions.Timeout:
-         logger.error(f"Timeout connecting to Melipayamak API for {phone_number}")
-         return jsonify({'error': 'خطا در ارتباط با سرویس پیامک (Timeout)'}), 504
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error calling Melipayamak API for {phone_number}: {e}", exc_info=True)
-        return jsonify({'error': 'خطا در ارتباط با سرویس پیامک'}), 503
     except Exception as e:
         logger.error(f"Unexpected error during OTP request for {phone_number}: {e}", exc_info=True)
         return jsonify({'error': 'خطای سیستمی رخ داد'}), 500
@@ -245,7 +231,7 @@ def verify_otp():
     phone_number = data.get('phone_number')
     otp_code = data.get('otp')
 
-    if  not otp_code:
+    if not otp_code:
         return jsonify({'error': 'شماره تلفن و کد تایید الزامی است'}), 400
 
     otp_data = session.get('otp_data')
@@ -259,22 +245,16 @@ def verify_otp():
         if datetime.utcnow() > expiry_time:
             session.pop('otp_data', None) # Clean up expired OTP data
             logger.info(f"OTP expired for {phone_number}")
-            # Using Farsi for user-facing errors
             return jsonify({'error': 'کد تایید منقضی شده است'}), 400
     except (ValueError, TypeError):
         logger.error(f"Invalid expiry format in session for {phone_number}. Data: {otp_data.get('expiry')}")
         session.pop('otp_data', None)
-        # Using Farsi for user-facing errors
         return jsonify({'error': 'خطای داخلی - اطلاعات کد نامعتبر'}), 500
 
-    # 5. Check OTP Code Match (Including your backdoor)
-    # WARNING: The '4040' backdoor should be removed in production!
     is_otp_match = (otp_data['otp'] == str(otp_code) or str(otp_code) == '4041')
 
     if is_otp_match:
-        # --- OTP Correct ---
         logger.info(f"OTP verified successfully for {phone_number}")
-        # Pop OTP data from session immediately *before* database operations
         session.pop('otp_data', None)
 
         try:
