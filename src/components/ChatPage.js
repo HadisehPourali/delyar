@@ -56,6 +56,7 @@ const ChatPage = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const isInitialMount = useRef(true);
+  const streamingIntervalRef = useRef(null);
 
   const SESSION_PRICE = parseInt(process.env.REACT_APP_SESSION_PRICE, 10) || 39000;
 
@@ -104,112 +105,123 @@ const ChatPage = () => {
     return scrollHeight - scrollTop - clientHeight > 100;
   };
 
+  const simulateResponseStreaming = useCallback((botMessageId, fullResponse) => {
+    let currentIndex = 0;
+    const chunkSize = 1; // Number of characters per chunk
+    const streamingDelay = 35; // Milliseconds between chunks
+    
+    const streamInterval = setInterval(() => {
+      if (currentIndex < fullResponse.length) {
+        // Calculate next chunk end position
+        const nextIndex = Math.min(currentIndex + chunkSize, fullResponse.length);
+        const currentContent = fullResponse.substring(0, nextIndex);
+        
+        // Update message with current chunk
+        setMessages(prevMessages => {
+          return prevMessages.map(msg => 
+            msg.id === botMessageId 
+              ? { ...msg, content: currentContent }
+              : msg
+          );
+        });
+        
+        currentIndex = nextIndex;
+      } else {
+        // Streaming complete
+        clearInterval(streamInterval);
+      }
+    }, streamingDelay);
+    
+    // Store interval reference to clear it if needed
+    return streamInterval;
+  }, []);
+
   // Update the sendMessage function with improved content handling
-const sendMessage = useCallback(async (contentOverride = null) => {
-  // Create a stable copy of the message content immediately
-  // Important: Store the exact text before any manipulation
-  const textToSend = contentOverride !== null ? String(contentOverride).trim() : String(userInput);
+  const sendMessage = useCallback(async (contentOverride = null) => {
+    // Create a stable copy of the message content immediately
+    const textToSend = contentOverride !== null ? String(contentOverride).trim() : String(userInput);
+    
+    console.log(`sendMessage called: text='${textToSend}', sessionId='${sessionId}', remainingTime=${remainingTime}`);
   
-  console.log(`sendMessage called: text='${textToSend}', sessionId='${sessionId}', remainingTime=${remainingTime}`);
-
-  if (!textToSend || !sessionId) {
-      console.log('sendMessage aborted: Missing text or sessionId');
-      if (contentOverride && isWaitingForResponse) setIsWaitingForResponse(false);
-      return;
-  }
-
-  if (remainingTime <= 0 && !contentOverride) {
-      showStatusMessage("زمان شما تمام شده.", 4000, 'error');
-      console.log('sendMessage aborted: Time up for manual message');
-      return;
-  }
-
-  // Store exact content in a stable variable to ensure consistency
-  const exactUserMessage = textToSend;
+    if (!textToSend || !sessionId) {
+        console.log('sendMessage aborted: Missing text or sessionId');
+        if (contentOverride && isWaitingForResponse) setIsWaitingForResponse(false);
+        return;
+    }
   
-  setIsWaitingForResponse(true);
+    if (remainingTime <= 0 && !contentOverride) {
+        showStatusMessage("زمان شما تمام شده.", 4000, 'error');
+        console.log('sendMessage aborted: Time up for manual message');
+        return;
+    }
   
-  // Create user message with the exact content
-  const newUserMessage = { 
-      sender: 'user', 
-      content: exactUserMessage,  // Use the exact stored message
-      type: 'USER',
-      timestamp: new Date().toISOString() // Add timestamp for possible sorting
-  };
+    // Store exact content in a stable variable to ensure consistency
+    const exactUserMessage = textToSend;
+    
+    setIsWaitingForResponse(true);
+    
+    // Create user message with the exact content
+    const newUserMessage = { 
+        sender: 'user', 
+        content: exactUserMessage,
+        type: 'USER',
+        timestamp: new Date().toISOString()
+    };
+    
+    // Update messages state with complete user message
+    setMessages(prevMessages => [...prevMessages, newUserMessage]);
+    
+    // Add bot message with empty content to start streaming
+    const botMessageId = `bot-${Date.now()}`;
+    setMessages(prevMessages => [...prevMessages, { 
+        id: botMessageId,
+        sender: 'bot', 
+        content: '', 
+        type: 'AI', 
+        timestamp: new Date().toISOString()
+    }]);
+    
+    // Clear input only after message is added to state
+    if (!contentOverride) setUserInput('');
+    userHasScrolledUpRef.current = false;
   
-  // Update messages state with complete user message
-  setMessages(prevMessages => [...prevMessages, newUserMessage]);
-  
-  // Add loading indicator separately after user message is added
-  setMessages(prevMessages => [...prevMessages, { 
-      sender: 'bot', 
-      content: '', 
-      type: 'AI', 
-      isLoading: true,
-      timestamp: new Date().toISOString()
-  }]);
-  
-  // Clear input only after message is added to state
-  if (!contentOverride) setUserInput('');
-  userHasScrolledUpRef.current = false;
-
-  try {
-      const firstUserMessage = messages.filter(msg => msg.type === 'USER').length === 0;
-      
-      // Use the exact stored message in the API call
-      const response = await axios.post(`${API_URL}/respond`, {
+    try {
+        const firstUserMessage = messages.filter(msg => msg.type === 'USER').length === 0;
+        
+        // Use the exact stored message in the API call
+        const response = await axios.post(`${API_URL}/respond`, {
           sessionId,
-          content: exactUserMessage, // Use exact message
+          content: exactUserMessage,
           isFirstMessage: firstUserMessage,
           messageType: 'USER'
       });
+  
+        if (streamingIntervalRef.current) {
+            clearInterval(streamingIntervalRef.current);
+        }
+        streamingIntervalRef.current = simulateResponseStreaming(botMessageId, response.data.content);
 
-      // Update bot message with response content
-      setMessages(prevMessages => {
-          const updated = [...prevMessages];
-          const loadingIndex = updated.findIndex(msg => msg.isLoading);
-          
-          if (loadingIndex !== -1) {
-              // Replace loading message with response
-              updated[loadingIndex] = { 
-                  sender: 'bot', 
-                  content: response.data.content, 
-                  type: 'AI',
-                  timestamp: new Date().toISOString()
-              };
-          } else {
-              // Fallback if loading message not found
-              updated.push({ 
-                  sender: 'bot', 
-                  content: response.data.content, 
-                  type: 'AI',
-                  timestamp: new Date().toISOString()
-              });
-          }
-          return updated;
-      });
-
-  } catch (error) {
-      console.error('Error sending message:', error.response?.data || error.message);
-      const errorData = error.response?.data;
-      showStatusMessage(errorData?.error || 'خطا در ارسال پیام', 5000, 'error');
-      
-      // Remove loading message on error
-      setMessages(prevMessages => 
-          prevMessages.filter(msg => !msg.isLoading)
-      );
-
-      if (errorData?.session_ended) {
-          setRemainingTime(0);
-          if (intervalRef.current) {
-              clearInterval(intervalRef.current);
-              intervalRef.current = null;
-          }
-      }
-  } finally {
-      setIsWaitingForResponse(false);
-  }
-}, [sessionId, showStatusMessage, API_URL, remainingTime, messages, userInput]);
+    } catch (error) {
+        console.error('Error sending message:', error.response?.data || error.message);
+        const errorData = error.response?.data;
+        showStatusMessage(errorData?.error || 'خطا در ارسال پیام', 5000, 'error');
+        
+        // Remove bot message on error
+        setMessages(prevMessages => 
+            prevMessages.filter(msg => msg.id !== botMessageId)
+        );
+  
+        if (errorData?.session_ended) {
+            setRemainingTime(0);
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current);
+                intervalRef.current = null;
+            }
+        }
+    } finally {
+        setIsWaitingForResponse(false);
+    }
+  }, [sessionId, showStatusMessage, API_URL, remainingTime, messages, userInput]);
 
   // --- New Function: Check and Start Next Session ---
   const handleStartNextSession = async () => {
@@ -353,6 +365,7 @@ const sendMessage = useCallback(async (contentOverride = null) => {
       console.log("--- ChatPage Cleanup ---");
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current);
+      if (streamingIntervalRef.current) clearInterval(streamingIntervalRef.current);
     };
   }, [location.state?.sessionId, navigate, showStatusMessage, checkForNextSession]);
 
