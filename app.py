@@ -82,6 +82,15 @@ ZARINPAL_STARTPAY_URL = 'https://www.zarinpal.com/pg/StartPay/'
 # STT Configuration
 STT_API_KEY = os.getenv('API_KEY')  # Add this to your .env file
 STT_API_URL = os.getenv('STT_API_URL', 'https://api.metisai.ir/openai/v1/audio/transcriptions')
+
+DISCOUNT_CODES = {
+    'javaheri': 50,  
+    'moshaverto': 50,  
+    'hamrah': 25, 
+    'freedelyar': 100
+
+}
+
 # --- Database Models ---
 
 class User(db.Model):
@@ -160,7 +169,9 @@ class PendingTransaction(db.Model):
     phone_number = db.Column(db.String(20), nullable=False, index=True)
     authority = db.Column(db.String(100), nullable=False, unique=True, index=True)
     amount = db.Column(db.Integer, nullable=False)
+    original_amount = db.Column(db.Integer, nullable=False)
     session_count = db.Column(db.Integer, nullable=False)
+    discount_code = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 # Temporary storage for OTPs (Replace with Redis/DB in production!)
@@ -788,6 +799,7 @@ def payment_request():
     data = request.json
     amount = data.get('amount')
     session_count = data.get('sessionCount')
+    discount_code = data.get('discountCode')
 
     if not isinstance(amount, int) or not isinstance(session_count, int) or amount <= 0 or session_count <= 0:
         return jsonify({'error': 'مبلغ و تعداد جلسات نامعتبر است'}), 400
@@ -798,63 +810,97 @@ def payment_request():
          logger.warning(f"Payment request amount mismatch user {user.id}. Expected: {expected_amount}, Got: {amount}")
          return jsonify({'error': 'مبلغ درخواستی با تعداد جلسات همخوانی ندارد'}), 400
 
+    # Handle discount code
+    payment_amount = expected_amount
+    applied_discount_percentage = 0
+    applied_discount_code = None
+
+    if discount_code:
+        if discount_code in DISCOUNT_CODES:
+            applied_discount_percentage = DISCOUNT_CODES[discount_code]
+            discount_multiplier = (100 - applied_discount_percentage) / 100
+            payment_amount = int(expected_amount * discount_multiplier)
+            applied_discount_code = discount_code
+            logger.info(f"Applied discount code {applied_discount_code} ({applied_discount_percentage}%) for user {user.id}. Original: {expected_amount}, Payment: {payment_amount}")
+
+            # Handle 100% discount
+            if applied_discount_percentage == 100:
+                try:
+                    user.wallet_balance = (user.wallet_balance or 0) + expected_amount
+                    now = datetime.utcnow()
+                    new_purchase = Purchase(
+                        user_id=user.id,
+                        purchase_time=now,
+                        amount_paid=0,  # No payment made
+                        sessions_purchased=0,
+                        payment_ref_id=f"DISC100_{discount_code}_{now.strftime('%Y%m%d%H%M%S')}"  # Unique ref ID
+                    )
+                    db.session.add(new_purchase)
+                    db.session.commit()
+                    logger.info(f"100% discount applied for user {user.id}. Credited {expected_amount} to wallet. Purchase ID: {new_purchase.id}")
+                    return jsonify({
+                        'status': 200,
+                        'message': 'کد تخفیف 100% اعمال شد و کیف پول شارژ شد',
+                        'original_amount': expected_amount,
+                        'payment_amount': 0,
+                        'wallet_balance': user.wallet_balance
+                    }), 200
+                except Exception as e:
+                    db.session.rollback()
+                    logger.error(f"Error applying 100% discount for user {user.id}: {str(e)}", exc_info=True)
+                    return jsonify({'error': 'خطا در اعمال کد تخفیف 100%'}), 500
+        else:
+            logger.warning(f"Invalid discount code {discount_code} attempted by user {user.id}")
+            return jsonify({'error': 'کد تخفیف نامعتبر است'}), 400
+
     if not ZARINPAL_MERCHANT_ID:
          logger.error("Zarinpal Merchant ID not configured.")
          return jsonify({'error': 'سرویس پرداخت در دسترس نیست'}), 503
 
     try:
         client = Client(ZARINPAL_WEBSERVICE)
-        # Construct callback URL dynamically and securely
-        # Ensure request.host_url includes the correct scheme (http/https)
-        host_url = request.host_url
-        if os.getenv('FLASK_ENV') != 'development' and not host_url.startswith('https'):
-             # In production, force HTTPS for callback if not already present
-             # This might depend on your proxy setup (e.g., Nginx) correctly setting headers
-             # host_url = host_url.replace('http://', 'https://', 1)
-             logger.warning("Callback URL might be HTTP in non-dev environment. Ensure proxy sets scheme correctly.")
-
         callback_url = url_for('payment_verify', _external=True, _scheme='https' if os.getenv('FLASK_ENV') != 'development' else 'http')
-        # Fallback if url_for has issues with external/scheme behind proxy:
-        # callback_url = f"{host_url.rstrip('/')}{url_for('payment_verify')}"
         logger.info(f"Zarinpal Callback URL: {callback_url}")
 
         description = f"خرید {session_count} جلسه مشاوره دلیار"
-        # Metadata can be used to pass additional info, check Zarinpal docs if needed
-        # metadata = {"user_id": user.id, "phone": user.phone_number}
+        if applied_discount_code:
+            description += f" با کد تخفیف {applied_discount_code}"
 
         result = client.service.PaymentRequest(
             ZARINPAL_MERCHANT_ID,
-            amount,
+            payment_amount,
             description,
-            None, # Email (optional) - can add user.email if collected
-            user.phone_number, # Mobile (optional but recommended)
+            None,
+            user.phone_number,
             callback_url
-            # metadata # Pass metadata if using Zarinpal's newer APIs that support it
         )
 
         if result.Status == 100:
             pending = PendingTransaction(
                 phone_number=user.phone_number,
                 authority=result.Authority,
-                amount=amount,
-                session_count=session_count
+                amount=payment_amount,
+                original_amount=expected_amount,
+                session_count=session_count,
+                discount_code=applied_discount_code,
             )
             db.session.add(pending)
             db.session.commit()
-            logger.info(f"Payment request initiated for user {user.id}, Authority: {result.Authority}")
+            logger.info(f"Payment request initiated for user {user.id}, Authority: {result.Authority}, Discount: {applied_discount_percentage}%")
             payment_url = f"{ZARINPAL_STARTPAY_URL}{result.Authority}"
             return jsonify({
                 'status': 100,
                 'authority': result.Authority,
-                'payment_url': payment_url
-                })
+                'payment_url': payment_url,
+                'original_amount': expected_amount,
+                'payment_amount': payment_amount
+            })
         else:
             logger.error(f"Zarinpal PaymentRequest failed user {user.id}. Status: {result.Status}, Message: {result.Message}")
-            # Map common Zarinpal errors to user-friendly messages if possible
             error_message = f'خطا در شروع فرآیند پرداخت (کد: {result.Status})'
             return jsonify({'error': error_message}), 400
 
-    except requests.exceptions.RequestException as req_err: # Catch suds transport errors
+    except requests.exceptions.RequestException as req_err:
         db.session.rollback()
         logger.error(f"Suds/HTTP error during Zarinpal request for user {user.id}: {str(req_err)}", exc_info=True)
         return jsonify({'error': 'خطا در ارتباط با درگاه پرداخت'}), 503
@@ -863,7 +909,7 @@ def payment_request():
         logger.error(f"Error during payment request for user {user.id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'خطای سیستمی در هنگام درخواست پرداخت'}), 500
 
-
+# Update /api/payment/verify endpoint
 @app.route('/api/payment/verify', methods=['GET'])
 def payment_verify():
     authority = request.args.get('Authority')
@@ -905,24 +951,23 @@ def payment_verify():
                 return redirect(f"{FRONTEND_URL}/start?status=failed&reason=user_sync_error&refid={result.RefID}")
 
             try:
-                # CHANGE: Add amount to wallet_balance instead of available_session_minutes
-                user.wallet_balance = (user.wallet_balance or 0) + pending.amount
-                # Remove session_minutes_to_add calculation and related updates
+                # Credit the ORIGINAL amount to the wallet
+                user.wallet_balance = (user.wallet_balance or 0) + pending.original_amount
                 now = datetime.utcnow()
 
-                # Record the successful top-up (not a session purchase)
+                # Record the successful top-up
                 new_purchase = Purchase(
                     user_id=user.id,
                     purchase_time=now,
-                    amount_paid=pending.amount,
-                    sessions_purchased=0,  # No sessions purchased, just a top-up
+                    amount_paid=pending.amount,  # Record actual paid amount
+                    sessions_purchased=0,
                     payment_ref_id=str(result.RefID),
                 )
                 db.session.add(new_purchase)
                 db.session.delete(pending)
                 db.session.commit()
 
-                logger.info(f"DB updated successfully for user {user.id} after Zarinpal payment. Added {pending.amount} to wallet. New balance: {user.wallet_balance}. RefID: {result.RefID}.")
+                logger.info(f"DB updated successfully for user {user.id} after Zarinpal payment. Added {pending.original_amount} to wallet (Paid: {pending.amount}). New balance: {user.wallet_balance}. RefID: {result.RefID}.")
                 return redirect(f"{FRONTEND_URL}/start?status=success&refid={result.RefID}")
 
             except Exception as db_err:
@@ -951,6 +996,7 @@ def payment_verify():
     except Exception as e:
         logger.error(f"Error during Zarinpal payment verification process for Authority {authority}: {str(e)}", exc_info=True)
         return redirect(f"{FRONTEND_URL}/start?status=failed&reason=verification_error")
+    
 # --- Feedback Endpoint ---
 
 @app.route('/api/feedback', methods=['POST'])

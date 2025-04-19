@@ -60,6 +60,9 @@ const StartPage = () => {
 
   const SESSION_PRICE = parseInt(process.env.REACT_APP_SESSION_PRICE, 10) || 39000;
 
+  const [discountCode, setDiscountCode] = useState('');
+  const [discountApplied, setDiscountApplied] = useState(false);
+  const [discountedAmount, setDiscountedAmount] = useState(null);
   // --- Helper Functions ---
 
   // Function to display messages and auto-clear them
@@ -320,33 +323,42 @@ const StartPage = () => {
     if (!isLoggedIn) {
       showStatusMessage('لطفاً ابتدا وارد شوید.', 4000, 'warning');
       setShowAuthForm(true);
-      setIsConfirmModalOpen(false); // Close confirm modal if open
+      setIsConfirmModalOpen(false);
       return;
     }
-    setMessage(''); // Clear status messages
-    setIsConfirmModalOpen(false); // Close confirm modal before proceeding
-    setIsAuthLoading(true); // Use a general loading indicator
+    setMessage('');
+    setIsConfirmModalOpen(false);
+    setIsAuthLoading(true);
 
     try {
       const totalAmount = sessionCount * SESSION_PRICE;
       const response = await axios.post(`${API_URL}/api/payment/request`, {
         amount: totalAmount,
         sessionCount,
+        discountCode: discountCode || null,
       });
 
-      if (response.data.status === 100 && response.data.payment_url) {
-        showStatusMessage('در حال انتقال به درگاه پرداخت...', 10000); // Show message before redirect
-        // Redirect user to Zarinpal
+      if (response.data.status === 200 && response.data.payment_amount === 0) {
+        // 100% discount applied
+        showStatusMessage(response.data.message || 'کیف پول با موفقیت شارژ شد!', 5000, 'success');
+        setWalletBalance(response.data.wallet_balance);
+        setUserData(prev => ({ ...prev, wallet_balance: response.data.wallet_balance }));
+        setDiscountCode('');
+        setDiscountApplied(false);
+        setDiscountedAmount(null);
+      } else if (response.data.status === 100 && response.data.payment_url) {
+        showStatusMessage('در حال انتقال به درگاه پرداخت...', 10000);
+        setDiscountCode('');
+        setDiscountApplied(false);
+        setDiscountedAmount(null);
         window.location.href = response.data.payment_url;
-        // Note: Loading state won't be reset here as the page redirects
       } else {
-         // Should be caught by axios error handling, but as fallback:
          showStatusMessage(response.data.error || 'خطا در ایجاد درخواست پرداخت', 5000, 'error');
-         setIsAuthLoading(false);
       }
     } catch (error) {
       console.error('Payment Request error:', error.response?.data || error.message);
       showStatusMessage(error.response?.data?.error || 'خطا در اتصال به درگاه پرداخت', 5000, 'error');
+    } finally {
       setIsAuthLoading(false);
     }
   };
@@ -838,21 +850,51 @@ const StartPage = () => {
     
            {/* --- Zarinpal Confirmation Modal (Uses base styles) --- */}
            {isConfirmModalOpen && (
-          <>
+            <>
               <div className="modal-overlay" onClick={() => setIsConfirmModalOpen(false)} />
               <div className="modal confirm-modal">
-                  <div className="modal-content">
-                      <h3>تأیید شارژ کیف پول</h3>
-                      <p>شما در حال شارژ کیف پول خود به مبلغ <strong style={{color: '#19386a'}}>{(sessionCount * SESSION_PRICE).toLocaleString()} تومان</strong> هستید.</p>
-                      <p>برای تکمیل فرآیند به درگاه پرداخت زرین‌پال هدایت خواهید شد.</p>
+                <div className="modal-content">
+                  <h3>تأیید شارژ کیف پول</h3>
+                  <p>
+                    شما در حال شارژ کیف پول خود به مبلغ{' '}
+                    <strong style={{color: '#19386a'}}>{(sessionCount * SESSION_PRICE).toLocaleString()} تومان</strong> هستید.
+                  </p>
+                  {discountedAmount && discountApplied ? (
+                    <p>
+                      با اعمال کد تخفیف، مبلغ قابل پرداخت:{' '}
+                      <strong style={{color: '#28a745'}}>{discountedAmount.toLocaleString()} تومان</strong>
+                    </p>
+                  ) : null}
+                  <div className="form-group" style={{marginTop: '15px'}}>
+                    <label htmlFor="discountCode">کد تخفیف (اختیاری)</label>
+                    <input
+                      type="text"
+                      id="discountCode"
+                      value={discountCode}
+                      onChange={(e) => setDiscountCode(e.target.value)}
+                      placeholder="مثال: SAVE50"
+                      disabled={isAuthLoading}
+                      style={{width: '100%', padding: '8px', marginTop: '5px'}}
+                    />
                   </div>
-                  <div className="modal-actions">
-                      <button onClick={() => setIsConfirmModalOpen(false)} className="cancel-button">انصراف</button>
-                      <button onClick={initiatePayment} className="confirm-button">تایید و انتقال به درگاه</button>
-                  </div>
+                  <p>برای تکمیل فرآیند به درگاه پرداخت زرین‌پال هدایت خواهید شد.</p>
+                </div>
+                <div className="modal-actions">
+                  <button onClick={() => {
+                    setIsConfirmModalOpen(false);
+                    setDiscountCode('');
+                    setDiscountApplied(false);
+                    setDiscountedAmount(null);
+                  }} className="cancel-button">
+                    انصراف
+                  </button>
+                  <button onClick={initiatePayment} className="confirm-button" disabled={isAuthLoading}>
+                    {isAuthLoading ? '...' : 'تایید و انتقال به درگاه'}
+                  </button>
+                </div>
               </div>
-          </>
-      )}
+            </>
+          )}
     
            {/* --- Direct Purchase Confirmation Modal (Uses base styles) --- */}
            {isPurchaseModalOpen && (
